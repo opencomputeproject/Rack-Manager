@@ -1,0 +1,12 @@
+[submodule "Olympus-rackmanager-build"]
+	path = Olympus-rackmanager-build
+	url = https://github.com/opencomputeproject/Project-Olympus-rackmanager-build.git
+[submodule "Olympus_rack_manager_bsp"]
+	path = Olympus_rack_manager_bsp
+	url = https://github.com/opencomputeproject/Project-Olympus-Rackmanager-bsp.git
+[submodule "Olympus_meta_rack_manager"]
+	path = Olympus_meta_rack_manager
+	url = https://github.com/opencomputeproject/Project_Olympus_meta-rackmanager.git
+[submodule "Olympus_rack_manager"]
+	path = Olympus_rack_manager
+	url = https://github.com/opencomputeproject/Project_Olympus_rack_manager.git
