@@ -1,0 +1,3 @@
+include-generated/
+xml/metadata_root.xml
+xml/validator.py
