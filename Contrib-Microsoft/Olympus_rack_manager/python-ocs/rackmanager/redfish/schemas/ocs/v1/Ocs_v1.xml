@@ -1,0 +1,463 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<edmx:Edmx xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx" Version="4.0">
+
+  <edmx:Reference Uri="http://docs.oasis-open.org/odata/odata/v4.0/cs01/vocabularies/Org.OData.Core.V1.xml">
+    <edmx:Include Namespace="Org.OData.Core.V1" Alias="OData"/>
+  </edmx:Reference>
+  <edmx:Reference Uri="schemas/xml/v1/RedfishExtensions_v1.xml">
+    <edmx:Include Namespace="RedfishExtensions.v1_0_0" Alias="Redfish"/>
+  </edmx:Reference>
+  <edmx:Reference Uri="schemas/xml/v1/Resource_v1.xml">
+    <edmx:Include Namespace="Resource"/>
+    <edmx:Include Namespace="Resource.v1_0_0" />
+    <edmx:Include Namespace="Resource.v1_1_0" />
+  </edmx:Reference>
+  <edmx:Reference Uri="schemas/xml/v1/ComputerSystem_v1.xml">
+    <edmx:Include Namespace="ComputerSystem.v1_0_0" />
+  </edmx:Reference>
+  <edmx:Reference Uri="schemas/ocs/v1/OcsPower_v1.xml">
+    <edmx:Include Namespace="OcsPower" />
+  </edmx:Reference>
+  <edmx:Reference Uri="schemas/ocs/v1/OcsPowerMeter_v1.xml">
+    <edmx:Include Namespace="OcsPowerMeter" />
+  </edmx:Reference>
+
+  <edmx:DataServices>
+  
+    <Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="Ocs">
+    
+      <ComplexType Name="Message" Abstract="true">
+        <Annotation Term="OData.Description" String="This defines OCS extensions to the Redfish Message object."/>
+        <Annotation Term="OData.LongDescription" String="This defines OCS extensions to the Redfish Message object."/>
+        <Annotation Term="OData.AdditionalProperties" Bool="false"/>
+      </ComplexType>
+      
+      <ComplexType Name="ComputerSystem" Abstract="true">
+        <Annotation Term="OData.Description" String="This defines OCS extensions to the Redfish ComputerSystem object."/>
+        <Annotation Term="OData.LongDescription" String="This defines OCS extensions to the Redfish ComputerSystem object."/>
+        <Annotation Term="OData.AdditionalProperties" Bool="false"/>
+      </ComplexType>
+      
+      <ComplexType Name="Chassis" Abstract="true">
+        <Annotation Term="OData.Description" String="This defines OCS extensions to the Redfish Chassis object."/>
+        <Annotation Term="OData.LongDescription" String="This defines OCS extensions to the Redfish Chassis object."/>
+        <Annotation Term="OData.AdditionalProperties" Bool="false"/>
+      </ComplexType>
+      
+      <EntityType Name="BiosConfig" BaseType="Resource.v1_0_0.Resource" Abstract="true">
+        <Annotation Term="OData.Description" String="This represents the current BIOS configurations available to the system."/>
+        <Annotation Term="OData.LongDescription" String="This represents the current BIOS configurations available to the system."/>
+      </EntityType>
+      
+      <EntityType Name="BiosCode" BaseType="Resource.v1_0_0.Resource" Abstract="true">
+        <Annotation Term="OData.Description" String="This accesses the POST codes provided by the system BIOS."/>
+        <Annotation Term="OData.LongDescription" String="This accesses the POST codes provided by the system BIOS."/>
+      </EntityType>
+      
+      <EntityType Name="FPGA" BaseType="Resource.v1_0_0.Resource" Abstract="true">
+        <Annotation Term="OData.Description" String="This is the FPGA NIC used by the system."/>
+        <Annotation Term="OData.LongDescription" String="This is the FPGA NIC used by the system."/>
+      </EntityType>
+      
+      <ComplexType Name="FRU" Abstract="true">
+        <Annotation Term="OData.Description" String="This defines custom OCS entries in the FRU to identify components."/>
+        <Annotation Term="OData.LongDescription" String="This defines custom OCS entries in the FRU to identify components."/>
+        <Annotation Term="OData.AdditionalProperties" Bool="false"/>
+      </ComplexType>
+      
+      <EntityType Name="SensorService" BaseType="Resource.v1_0_0.Resource" Abstract="true">
+        <Annotation Term="OData.Description" String="This provides access to the complete set of sensors in the chassis."/>
+        <Annotation Term="OData.LongDescription" String="This provides access to the complete set of sensors in the chassis."/>
+      </EntityType>
+      
+      <ComplexType Name="Thermal" Abstract="true">
+        <Annotation Term="OData.Description" String="This defines OCS extensions to the Redfish Thermal object."/>
+        <Annotation Term="OData.LongDescription" String="This defines OCS extensions to the Redfish Thermal object."/>
+        <Annotation Term="OData.AdditionalProperties" Bool="false"/>
+      </ComplexType>
+      
+      <EntitiType Name="Inventory" BaseType="Resource.v1_0_0.Resource" Abstract="true">
+        <Annotation Term="OData.Description" String="This provides the set of items contained in a Chassis."/>
+        <Annotation Term="OData.LongDescription" String="This provides the set of items contained in a Chassis."/>
+      </EntitiType>
+      
+      <Action Name="RemoteMediaMount" IsBound="true">
+        <Parameter Name="ComputerSystem" Type="ComputerSystem.v1_0_0.OemActions"/>
+        <Parameter Name="ImageName" Type="Edm.String">
+          <Annotation Term="OData.Description" String="This is the name of the image to mount."/>
+          <Annotation Term="OData.LongDescription" String="This shall be the path to the image file to mount."/>
+        </Parameter>
+        <Annotation Term="OData.Description" String="This action will instruct a system to mount an image."/>
+        <Annotation Term="OData.LongDescription" String="This shall direct a system to mount a remote image."/>
+      </Action>
+      
+      <Action Name="RemoteMediaUnount" IsBound="true">
+        <Parameter Name="ComputerSystem" Type="ComputerSystem.v1_0_0.OemActions"/>
+        <Annotation Term="OData.Description" String="This action will instruct a system to unmount a mounted image."/>
+        <Annotation Term="OData.LongDescription" String="This shall direct a system to unmount a remote image that has been mounted."/>
+      </Action>
+    
+    </Schema>
+    
+    <Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="Ocs.v1_0_0">
+      
+      <ComplexType Name="Message" BaseType="Ocs.Message">
+        <Property Name="CompletionCode" Nullable="false" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="This property indicates completion information for a request."/>
+          <Annotation Term="OData.LongDescription" String="This property indicates completion information for a request."/>
+          <Annotation Term="Redfish.Required"/>
+        </Property>
+        <Property Name="Description" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="This property provides completion details for a request."/>
+          <Annotation Term="OData.LongDescription" String="This property provides completion details for a request."/>
+        </Property>
+      </ComplexType>
+      
+      <ComplexType Name="ComputerSystem" BaseType="Ocs.ComputerSystem">
+        <Property Name="TPMPhysicalPresence" Type="Edm.String">
+          <Annotation Term="OData.Description" String="This property provides the system TPM physcial presence setting."/>
+          <Annotation Term="OData.LongDescription" String="This property provides the system TPM physcial presence setting."/>
+        </Property>
+        <Property Name="DefaultPowerState" Type="ComputerSystem.v1_0_0.PowerState">
+          <Annotation Term="OData.Description" String="This property provides the default power state for the system."/>
+          <Annotation Term="OData.LongDescription" String="This property provides the default power state for the system."/>
+        </Property>
+        <Property Name="CPLDVersion" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="This property provides the firmware version of the CPLD."/>
+          <Annotation Term="OData.LongDescription" String="This property provides the firmware version of the CPLD."/>
+        </Property>
+        <NavigationProperty Name="BiosConfig" Type="Ocs.BiosConfig" Nullable="false">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="A reference to the system BIOS configuration."/>
+          <Annotation Term="OData.LongDescription" String="The value of this property shall be a link to a resource of type BiosConfig."/>
+        </NavigationProperty>
+        <NavigationProperty Name="BiosCode" Type="Ocs.BiosCode" Nullable="false">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="A reference to the system BIOS POST code."/>
+          <Annotation Term="OData.LongDescription" String="The value of this property shall be a link to a resource of type BiosCode."/>
+        </NavigationProperty>
+        <NavigationProperty Name="FPGA" Type="Ocs.FPGA" Nullable="false">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="A reference to the system FPGA information."/>
+          <Annotation Term="OData.LongDescription" String="The value of this property shall be a link to a resource of type FPGA."/>
+        </NavigationProperty>
+      </ComplexType>
+      
+      <ComplexType Name="Chassis" BaseType="Ocs.Chassis">
+        <Property Name="FRU" Type="Ocs.FRU">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="This property provides FRU information for the chassis."/>
+          <Annotation Term="OData.LongDescription" String="This property provides FRU information for the chassis."/>
+        </Property>
+        <NavigationProperty Name="PowerControl" Type="OcsPower.PowerControl" Nullable="false">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="A reference to power control functions of the chassis."/>
+          <Annotation Term="OData.LongDescription" String="The value of this property shall be a link to a resource of type OcsPower.PowerControl."/>
+        </NavigationProperty>
+        <NavigationProperty Name="PowerMeter" Type="OcsPowerMeter.PowerMeter" Nullable="false">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="A reference to the power meter in the chassis."/>
+          <Annotation Term="OData.LongDescription" String="The value of this property shall be a link to a resource of type OcsPowerMeter.PowerMeter."/>
+        </NavigationProperty>
+        <NavigationProperty Name="Inventory" Type="Ocs.Inventory" Nullable="false">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="A reference to the chassis inventory."/>
+          <Annotation Term="OData.LongDescription" String="The value of this property shall be a link to a resource of type Inventory."/>
+        </NavigationProperty>
+        <NavigationProperty Name="Sensors" Type="Ocs.SensorService" Nullable="false">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="A reference to the sensors available in the chassis."/>
+          <Annotation Term="OData.LongDescription" String="The value of this property shall be a link to a resource of type SensoreService."/>
+        </NavigationProperty>
+      </ComplexType>
+      
+      <EntityType Name="BiosConfig" BaseType="Ocs.BiosConfig">
+        <Property Name="CurrentConfiguration" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="This property provides the current BIOS configuration."/>
+          <Annotation Term="OData.LongDescription" String="This property provides the current BIOS configuration."/>
+        </Property>
+        <Property Name="ChosenConfiguration" Type="Edm.String">
+          <Annotation Term="OData.Description" String="This property provides the select BIOS configuration."/>
+          <Annotation Term="OData.LongDescription" String="This property provides the select BIOS configuration."/>
+        </Property>
+        <Property Name="AvailableConfigurations" Type="Collection(Ocs.v1_0_0.AvailableConfiguration)">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="This property provides the list of all available BIOS configurations."/>
+          <Annotation Term="OData.LongDescription" String="This property provides the list of all available BIOS configurations."/>
+        </Property>
+      </EntityType>
+      
+      <ComplexType Name="AvailableConfiguration" BaseType="Resource.ReferenceableMember">
+        <Annotation Term="OData.AdditionalProperties" Bool="false"/>
+        <Property Name="Name" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="This property provides the BIOS configuration name."/>
+          <Annotation Term="OData.LongDescription" String="This property provides the BIOS configuration name."/>
+        </Property>
+        <Property Name="Value" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="This property provides the BIOS configuration value."/>
+          <Annotation Term="OData.LongDescription" String="This property provides the BIOS configuration value."/>
+        </Property>
+      </ComplexType>
+      
+      <EntityType Name="BiosCode" BaseType="Ocs.BiosCode">
+        <Property Name="BiosCode" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="This property provides the BIOS POST code."/>
+          <Annotation Term="OData.LongDescription" String="This property provides the BIOS POST code."/>
+        </Property>
+      </EntityType>
+      
+      <EntityType Name="FPGA" BaseType="Ocs.FPGA">
+        <Property Name="FirmwareVersion" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The firmware version of this FPGA."/>
+          <Annotation Term="OData.LongDescription" String="The firmware version of this FPGA."/>
+        </Property>
+        <Property Name="ReadingCelsius" Type="Edm.Decimal">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The temperature of the FPGA."/>
+          <Annotation Term="OData.LongDescription" String="The temperature of the FPGA."/>
+          <Annotation Term="Measures.Unit" String="Cel"/>
+        </Property>
+        <Property Name="BypassMode" Type="Ocs.v1_0_0.BypassMode">
+          <Annotation Term="OData.Description" String="Indication if the FPGA logic is bypassed."/>
+          <Annotation Term="OData.LongDescription" String="Indication if the FPGA logic is bypassed."/>
+        </Property>
+        <Property Name="UserLogic" Type="Ocs.v1_0_0.UserLogic">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="Indication if the FPGA logic is enabled."/>
+          <Annotation Term="OData.LongDescription" String="Indication if the FPGA logic is enabled."/>
+        </Property>
+        <Property Name="ProductManufacturer" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The manufacturer of the product."/>
+          <Annotation Term="OData.LongDescription" String="The manufacturer of the product."/>
+        </Property>
+        <Property Name="ProductName" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The name of the FPGA board."/>
+          <Annotation Term="OData.LongDescription" String="The name of the FPGA board."/>
+        </Property>
+        <Property Name="ModelNumber" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The model number of the FPGA board."/>
+          <Annotation Term="OData.LongDescription" String="The model number of the FPGA board."/>
+        </Property>
+        <Property Name="Version" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The version of the FPGA board."/>
+          <Annotation Term="OData.LongDescription" String="The version of the FPGA board."/>
+        </Property>
+        <Property Name="SerialNumber" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The serial number of the FPGA board."/>
+          <Annotation Term="OData.LongDescription" String="The serial number of the FPGA board."/>
+        </Property>
+        <Property Name="FRUFileID" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The FRU ID of the FPGA board."/>
+          <Annotation Term="OData.LongDescription" String="The FRU ID of the FPGA board."/>
+        </Property>
+        <Property Name="Manufacturer" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The manufacturer of the FPGA board."/>
+          <Annotation Term="OData.LongDescription" String="The manufacturer of the FPGA board."/>
+        </Property>
+        <Property Name="UUID" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The UUID of the FPGA board."/>
+          <Annotation Term="OData.LongDescription" String="The UUID of the FPGA board."/>
+        </Property>
+        <Property Name="NICPort" Type="Ocs.v1_0_0.FPGALink">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The link status for the FPGA NIC port."/>
+          <Annotation Term="OData.LongDescription" String="The link status for the FPGA NIC port."/>
+        </Property>
+        <Property Name="TORPort" Type="Ocs.v1_0_0.FPGALink">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The link status for the FPGA TOR port."/>
+          <Annotation Term="OData.LongDescription" String="The link status for the FPGA TOR port."/>
+        </Property>
+      </EntityType>
+      
+      <ComplexType Name="FPGALink">
+        <Annotation Term="OData.AdditionalProperties" Bool="false"/>
+        <Property Name="PcieHIP" Type="Ocs.v1_0_0.LinkState">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="Indication if the PCIe link state."/>
+          <Annotation Term="OData.LongDescription" String="Indication if the PCIe link state."/>
+        </Property>
+        <Property Name="LinkState" Type="Ocs.v1_0_0.LinkState">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="Indication if the network link state."/>
+          <Annotation Term="OData.LongDescription" String="Indication if the network link state."/>
+        </Property>
+        <Property Name="RxActivity" Type="Edm.Boolean">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="Indication if there data being received."/>
+          <Annotation Term="OData.LongDescription" String="Indication if there data being received."/>
+        </Property>
+        <Property Name="TxActivity" Type="Edm.Boolean">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="Indication if there data being sent."/>
+          <Annotation Term="OData.LongDescription" String="Indication if there data being sent."/>
+        </Property>
+      </ComplexType>
+      
+      <EnumType Name="BypassMode">
+        <Member Name="Enabled">
+          <Annotation Term="OData.Description" String="Indicates the FPGA is in bypass."/>
+        </Member>
+        <Member Name="Disabled">
+          <Annotation Term="OData.Description" String="Indicates the FPGA is not in bypass."/>
+        </Member>
+      </EnumType>
+      
+      <EnumType Name="UserLogic">
+        <Member Name="Enabled">
+          <Annotation Term="OData.Description" String="Indicates the FPGA logic is enabled."/>
+        </Member>
+        <Member Name="Disabled">
+          <Annotation Term="OData.Description" String="Indicates the FPGA logic is is bypassed."/>
+        </Member>
+      </EnumType>
+      
+      <EnumType Name="LinkState">
+        <Member Name="Up">
+          <Annotation Term="OData.Description" String="Indicates that the link is up."/>
+        </Member>
+        <Member Name="Down">
+          <Annotation Term="OData.Description" String="Indicates that the link is down."/>
+        </Member>
+      </EnumType>
+      
+      <ComplexType Name="FRU" BaseType="Ocs.FRU">
+        <Property Name="FruId" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The FRU identifier."/>
+          <Annotation Term="OData.LongDescription" String="The FRU identifier."/>
+        </Property>
+        <Property Name="Version" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The board version."/>
+          <Annotation Term="OData.LongDescription" String="The board version."/>
+        </Property>
+        <Property Name="Build" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The board build information."/>
+          <Annotation Term="OData.LongDescription" String="The board build information."/>
+        </Property>
+        <Property Name="ManufacturerDate" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The date the board was manufactured."/>
+          <Annotation Term="OData.LongDescription" String="The date the board was manufactured."/>
+        </Property>
+        <Property Name="Subproduct" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="Subproduct name for this product."/>
+          <Annotation Term="OData.LongDescription" String="Subproduct name for this product."/>
+        </Property>
+      </ComplexType>
+      
+      <EntityType Name="SensorService" BaseType="Ocs.SensorService">
+        <Property Name="Sensors" Type="Collection(Ocs.v1_0_0.Sensor)">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The set of sensors available from the service."/>
+          <Annotation Term="OData.LongDescription" String="The set of sensors available from the service."/>
+        </Property>
+      </EntityType>
+      
+      <ComplexType Name="Sensor" BaseType="Resource.v1_0_0.ReferenceableMember">
+        <Annotation Term="OData.AdditionalProperties" Bool="false"/>
+        <Property Name="Name" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The name of the sensor."/>
+          <Annotation Term="OData.LongDescription" String="The name of the sensor."/>
+        </Property>
+        <Property Name="SensorNumber" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The number assigned to the sensor."/>
+          <Annotation Term="OData.LongDescription" String="The number assigned to the sensor."/>
+        </Property>
+        <Property Name="EntityID" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The sensor entity identifier."/>
+          <Annotation Term="OData.LongDescription" String="The sensor entity identifier."/>
+        </Property>
+        <Property Name="Status" Type="Resource.Status" Nullable="false"/>
+        <Property Name="Reading" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The reading from the sensor."/>
+          <Annotation Term="OData.LongDescription" String="The reading from the sensor."/>
+        </Property>
+      </ComplexType>
+      
+      <ComplexType Name="Thermal" BaseTye="Ocs.Thermal">
+        <Property Name="Humidity" Type="Edm.Decimal">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The current humidity reading."/>
+          <Annotation Term="OData.LongDescription" String="The current humidity reading."/>
+        </Property>
+      </ComplexType>
+      
+      <EntityType Name="Inventory" BaseType="Ocs.Inventory">
+        <Property Name="Contents" Type="Collection(Ocs.v1_0_0.InventoryItem)">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The list of items in the inventory."/>
+          <Annotation Term="OData.LongDescription" String="The list of items in the inventory."/>
+        </Property>
+      </EntityType>
+      
+      <ComplexType Name="InventoryItem">
+        <Annotation Term="OData.AdditionalProperties" Bool="false"/>
+        <Property Name="SlotId" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The ID of the slot in the chassis."/>
+          <Annotation Term="OData.LongDescription" String="The ID of the slot in the chassis."/>
+        </Property>
+        <Property Name="PortState" Type="PowerPort.v1_0_0.PowerState">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The current power state of the port."/>
+          <Annotation Term="OData.LongDescription" String="The current power state of the port."/>
+        </Property>
+        <Property Name="PortPresent" Type="Edm.Boolean">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="Indication if a system is present in the slot."/>
+          <Annotation Term="OData.LongDescription" String="Indication if a system is present in the slot."/>
+        </Property>
+        <Property Name="SwitchPort" Type="Edm.Decimal">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The port on the management switch used by the system."/>
+          <Annotation Term="OData.LongDescription" String="The port on the management switch used by the system."/>
+        </Property>
+        <Property Name="MAC1" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The MAC address of the system in the slot."/>
+          <Annotation Term="OData.LongDescription" String="The MAC address of the system in the slot."/>
+        </Property>
+        <Property Name="GUID" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The GUI for the system in the slot."/>
+          <Annotation Term="OData.LongDescription" String="The GUI for the system in the slot."/>
+        </Property>
+      </ComplexType>
+      
+      <ComplexType Name="Actions">
+        <Annotation Term="OData.AdditionalProperties" Bool="false"/>
+        <Property Name="Oem" Type="Ocs.v1_0_0.OemActions" Nullable="false"/>
+      </ComplexType>
+
+      <ComplexType Name="OemActions">
+        <Annotation Term="OData.AdditionalProperties" Bool="true"/>
+      </ComplexType>
+      
+    </Schema>
+
+  </edmx:DataServices>
+</edmx:Edmx>

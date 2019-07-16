@@ -1,0 +1,1685 @@
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 4798eb4..9563743 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -432,7 +432,8 @@ dtb-$(CONFIG_SOC_AM43XX) += \
+ 	am437x-sk-evm.dtb \
+ 	am437x-idk-evm.dtb \
+ 	am437x-gp-evm.dtb \
+-	am437x-gp-evm-hdmi.dtb
++	am437x-gp-evm-hdmi.dtb \
++	am437x-ms-ocs.dtb
+ dtb-$(CONFIG_SOC_OMAP5) += \
+ 	omap5-cm-t54.dtb \
+ 	omap5-sbc-t54.dtb \
+diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
+index 05c5037..0ddaf77 100644
+--- a/arch/arm/boot/dts/am4372.dtsi
++++ b/arch/arm/boot/dts/am4372.dtsi
+@@ -833,6 +833,19 @@
+ 			};
+ 
+ 		};
++		/*FXN_LAWRENCE_20160517_FXNXXXXXX001*/
++		adc1:   adc1@4834c000 {
++                        compatible = "ti,am437x-adc1";
++                        #io-channel-cells = <1>;
++                        reg = <0x4834c000 0x1000>;
++                        ti,hwmods = "adc1";
++                        clocks = <&l3s_gclk>;
++                        interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
++                        clock-names = "fck";
++                        status = "disabled";
++
++                };
++		/*FXN_LAWRENCE_20160517_FXNXXXXXX001*/
+ 
+ 		sham: sham@53100000 {
+ 			compatible = "ti,omap5-sham";
+@@ -1146,10 +1159,15 @@
+ 
+ 		ocmcram: ocmcram@40300000 {
+ 			compatible = "mmio-sram";
+-			reg = <0x40300000 0x40000>; /* 256k */
++			reg = <0x40300000 0x10000>; /* 64k */
+ 			map-exec;
+ 		};
+ 
++		ocmcram_nocache: ocmcram_nocache@40310000 {
++			compatible = "mmio-sram";
++			reg = <0x40310000 0x30000>; /* 192k */
++		};
++
+ 		dcan0: can@481cc000 {
+ 			compatible = "ti,am4372-d_can", "ti,am3352-d_can";
+ 			ti,hwmods = "d_can0";
+diff --git a/arch/arm/boot/dts/am437x-ms-ocs.dts b/arch/arm/boot/dts/am437x-ms-ocs.dts
+new file mode 100644
+index 0000000..3f13318
+--- /dev/null
++++ b/arch/arm/boot/dts/am437x-ms-ocs.dts
+@@ -0,0 +1,724 @@
++/*
++ * Copyright (C) 2014 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++/* AM437x MS OCS M2010 */
++
++/dts-v1/;
++
++#include "am4372.dtsi"
++#include <dt-bindings/pinctrl/am43xx.h>
++#include <dt-bindings/pwm/pwm.h>
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++#include <dt-bindings/interrupt-controller/irq.h>
++
++/ {
++    model = "MS_OCS_RM_101.0.3.413";
++    compatible = "ti,am437x-sk-evm","ti,am4372","ti,am43";
++
++
++    vmmcsd_fixed: fixedregulator-sd {
++		compatible = "regulator-fixed";
++		regulator-name = "vmmcsd_fixed";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++		enable-active-high;
++	};
++
++    leds {
++        compatible = "gpio-leds";
++
++        pinctrl-names = "default";
++        pinctrl-0 = <&leds_pins>;
++
++        led@0 {
++            label = "m2010:orange:attention";
++            gpios = <&gpio3 13 GPIO_ACTIVE_HIGH>;
++            default-state = "off";
++        };
++
++    };
++};
++
++&am43xx_pinmux {
++    leds_pins: leds_pins {
++        pinctrl-single,pins = <
++            0x2c4 (PIN_OUTPUT_PULLDOWN | MUX_MODE7)  /* usb1_drvvbus.gpio3_13 */
++        >;
++    };
++    
++    gpio0_pins: gpio0_pins {
++        pinctrl-single,pins = <
++            0x150 (PIN_OUTPUT_PULLUP | MUX_MODE7)   /* spi0_sclk.gpio0_2 */
++            0x154 (PIN_OUTPUT_PULLUP | MUX_MODE7)   /* spi0_d0.gpio0_3 */ /* Changed to fix FWREADY_EN reset */
++            0x160 (PIN_OUTPUT_PULLUP | MUX_MODE7)   /* spi0_cs1.gpio0_6*/
++            0x164 (PIN_INPUT_PULLUP | MUX_MODE7)    /* ecap0_in_pwm0_out.gpio0_7 */
++            0xd0 (PIN_INPUT_PULLUP | MUX_MODE7) /* dss_data12.gpio0_8 */
++            0xd4 (PIN_INPUT_PULLUP | MUX_MODE7) /* dss_data13.gpio0_9 */
++            0xd8 (PIN_INPUT_PULLUP | MUX_MODE7)    /* dss_data14.gpio0_10 */
++            0xdc (PIN_INPUT_PULLUP | MUX_MODE7)    /* dss_data15.gpio0_11 */
++            0x278 (PIN_INPUT_PULLUP | MUX_MODE7)    /* clkreq.gpio0_24 */
++            0x144 (PIN_OUTPUT_PULLDOWN | MUX_MODE7) /* rmii1_ref_clk.gpio0_29*/
++        >;
++    };
++
++    gpio1_pins: gpio1_pins {
++        pinctrl-single,pins = <
++            0x0 (PIN_OUTPUT_PULLUP | MUX_MODE7) /* gpmc_ad0.gpio1_0 */
++            0x4 (PIN_OUTPUT_PULLUP | MUX_MODE7)    /* gpmc_ad1.gpio1_1 */
++            0x8 (PIN_OUTPUT_PULLUP | MUX_MODE7)    /* gpmc_ad2.gpio1_2 */
++            0xc (PIN_OUTPUT_PULLUP | MUX_MODE7)    /* gpmc_ad3.gpio1_3 */
++            0x10 (PIN_OUTPUT_PULLUP | MUX_MODE7)   /* gpmc_ad4.gpio1_4 */
++            0x14 (PIN_OUTPUT_PULLUP | MUX_MODE7)   /* gpmc_ad5.gpio1_5 */
++            0x18 (PIN_OUTPUT_PULLUP | MUX_MODE7)   /* gpmc_ad6.gpio1_6 */
++            0x1c (PIN_OUTPUT_PULLUP | MUX_MODE7)   /* gpmc_ad7.gpio1_7 */           
++            0x168 (PIN_OUTPUT_PULLUP | MUX_MODE7)   /* uart0_ctsn.gpio1_8 */
++            0x16c (PIN_OUTPUT_PULLUP | MUX_MODE7)  /* uart0_Rtsn.gpio1_9 */
++            0x78 (PIN_INPUT_PULLUP | MUX_MODE7) /* gpmc_be1n.gpio1_28 */
++        >;
++    };
++
++    gpio2_pins: gpio2_pins {
++        pinctrl-single,pins = <
++            0x8c (PIN_INPUT_PULLUP | MUX_MODE7) /* gpmc_clk.gpio2_1 */
++            0xa0 (PIN_INPUT_PULLUP | MUX_MODE7) /* dss_data0.gpio2_6 */
++            0xa4 (PIN_INPUT_PULLUP | MUX_MODE7)    /* dss_data1.gpio2_7 */
++            0xa8 (PIN_INPUT_PULLUP | MUX_MODE7)    /* dss_data2.gpio2_8 */
++            0xac (PIN_INPUT_PULLUP | MUX_MODE7)    /* dss_data3.gpio2_9 */
++            0xb0 (PIN_INPUT_PULLUP | MUX_MODE7)    /* dss_data4.gpio2_10 */
++            0xb8 (PIN_INPUT_PULLUP | MUX_MODE7)    /* dss_data6.gpio2_12 */
++            0xbc (PIN_INPUT_PULLUP | MUX_MODE7)    /* dss_data7.gpio2_13 */
++            0xc0 (PIN_INPUT_PULLUP | MUX_MODE7)    /* dss_data8.gpio2_14 */
++            0xc4 (PIN_INPUT_PULLUP | MUX_MODE7)    /* dss_data9.gpio2_15 */
++            0xc8 (PIN_INPUT_PULLUP | MUX_MODE7)    /* dss_data10.gpio2_16 */
++            0xcc (PIN_INPUT_PULLUP | MUX_MODE7)    /* dss_data11.gpio2_17 */
++            0xe0 (PIN_INPUT_PULLUP | MUX_MODE7) /* dss_vsync.gpio2_22 */
++            0xe4 (PIN_INPUT_PULLUP | MUX_MODE7) /* dss_hsync.gpio2_23 */
++            0xe8 (PIN_INPUT_PULLUP | MUX_MODE3)    /* dss_pclk.pr1_edio_data_in4 */
++            0xec (PIN_INPUT_PULLUP | MUX_MODE7)    /* dss_ac_bias_en.gpio2_25 */
++            0xf0 (PIN_OUTPUT_PULLUP | MUX_MODE7)   /* mmc0_dat3.gpio2_26 */
++            0xfc (PIN_OUTPUT_PULLUP | MUX_MODE7)   /* mmc0_dat0.gpio2_29 */
++            0x100 (PIN_OUTPUT_PULLUP | MUX_MODE7)  /* mmc0_clk.gpio2_30 */
++            0x104 (PIN_OUTPUT_PULLUP | MUX_MODE7)   /* mmc0_cmd.gpio2_31 */
++        >;
++    };
++
++    gpio3_pins: gpio3_pins {
++        pinctrl-single,pins = <
++            0x108 (PIN_OUTPUT_PULLDOWN | MUX_MODE7)  /* mii1_col.gpio3_0 */
++            0x190 (PIN_OUTPUT_PULLUP | MUX_MODE7)  /* mcasp0_aclkx.gpio3_14 */
++            0x194 (PIN_OUTPUT_PULLUP | MUX_MODE7)  /* mcasp0_fsx.gpio3_15 */
++            0x198 (PIN_OUTPUT_PULLUP | MUX_MODE7)  /* mcasp0_axr0.gpio3_16 */
++            0x19c (PIN_OUTPUT_PULLUP | MUX_MODE7)  /* mcasp0_ahclkr.gpio3_17 */
++            0x1a0 (PIN_INPUT_PULLUP | MUX_MODE7)   /* mcasp0_aclkr.gpio3_18 */
++            0x1a4 (PIN_INPUT_PULLUP | MUX_MODE7)   /* mcasp0_fsr.gpio3_19 */
++            0x1a8 (PIN_INPUT_PULLUP | MUX_MODE7)   /* mcasp0_axr1.gpio3_20 */
++            0x1ac (PIN_INPUT_PULLUP | MUX_MODE7)   /* mcasp0_ahclkx.gpio3_21 */
++            0x264 (PIN_INPUT_PULLUP | MUX_MODE7)   /* spi2_d0.gpio3_22 */
++            0x268 (PIN_INPUT_PULLUP | MUX_MODE7)   /* spi2_d1.gpio3_23 */
++            0x260 (PIN_INPUT_PULLUP | MUX_MODE7)   /* spi2_sclk.gpio3_24 */
++            0x26c (PIN_INPUT_PULLUP | MUX_MODE7)    /* spi2_cs0.gpio3_25 */
++        >;
++    };
++
++    gpio4_pins: gpio4_pins {
++        pinctrl-single,pins = <
++            0x1b0 (PIN_INPUT_PULLUP | MUX_MODE7)   /* cam0_hd.gpio4_0 */
++            0x1b4 (PIN_INPUT_PULLUP | MUX_MODE7)   /* cam0_vd.gpio4_1 */
++            0x1b8 (PIN_OUTPUT_PULLUP | MUX_MODE7)  /* cam0_field.gpio4_2 */
++            0x1bc (PIN_INPUT_PULLUP | MUX_MODE7)   /* cam0_wen.gpio4_3 */
++            0x1c0 (PIN_INPUT_PULLUP | MUX_MODE7)   /* cam0_pclk.gpio4_4 */
++            0x1c4 (PIN_INPUT_PULLUP | MUX_MODE7)   /* cam0_data8.gpio4_5 */
++            0x1c8 (PIN_INPUT_PULLUP | MUX_MODE7)   /* cam0_data9.gpio4_6 */
++            0x1cc (PIN_OUTPUT_PULLUP | MUX_MODE7)  /* cam1_data9.gpio4_7 */
++            0x1d0 (PIN_OUTPUT_PULLUP | MUX_MODE7)  /* cam1_data8.gpio4_8 */
++            0x1d4 (PIN_OUTPUT_PULLUP | MUX_MODE7)  /* cam1_hd.gpio4_9 */
++            0x1d8 (PIN_OUTPUT_PULLUP | MUX_MODE7)  /* cam1_vd.gpio4_10 */
++            0x1dc (PIN_INPUT_PULLUP | MUX_MODE7)   /* cam1_pclk.gpio4_11 */
++            0x1e0 (PIN_OUTPUT_PULLUP | MUX_MODE7)  /* cam1_field.gpio4_12 */
++            0x1e4 (PIN_OUTPUT_PULLUP | MUX_MODE7)  /* cam1_wen.gpio4_13 */
++            0x1e8 (PIN_INPUT_PULLUP | MUX_MODE7)   /* cam1_data0.gpio4_14 */
++            0x1ec (PIN_OUTPUT_PULLUP | MUX_MODE7)  /* cam1_data1.gpio4_15 */
++            0x1f0 (PIN_OUTPUT_PULLUP | MUX_MODE7)  /* cam1_data2.gpio4_16 */
++            0x1f4 (PIN_OUTPUT_PULLUP | MUX_MODE7)  /* cam1_data3.gpio4_17 */
++            0x1f8 (PIN_OUTPUT_PULLUP | MUX_MODE7)  /* cam1_data4.gpio4_18 */
++            0x1fc (PIN_OUTPUT_PULLUP | MUX_MODE7)  /* cam1_data5.gpio4_19 */
++            0x200 (PIN_OUTPUT_PULLUP | MUX_MODE7)  /* cam1_data6.gpio4_20 */
++            0x204 (PIN_OUTPUT_PULLUP | MUX_MODE7)  /* cam1_data7.gpio4_21 */
++            0x210 (PIN_INPUT_PULLUP | MUX_MODE7)   /* cam0_data2.gpio4_24 */
++            0x214 (PIN_INPUT_PULLUP | MUX_MODE7)   /* cam0_data3.gpio4_25 */
++            0x218 (PIN_INPUT_PULLUP | MUX_MODE7)   /* cam0_data4.gpio4_26 */
++            0x21c (PIN_INPUT_PULLUP | MUX_MODE7)   /* cam0_data5.gpio4_27 */
++            0x220 (PIN_INPUT_PULLUP | MUX_MODE7)   /* cam0_data6.gpio4_28 */
++            0x224 (PIN_INPUT_PULLUP | MUX_MODE7)    /* cam0_data7.gpio4_29 */
++        >;
++    };
++
++    gpio5_pins: gpio5_pins {
++        pinctrl-single,pins = <
++            0x230 (PIN_OUTPUT_PULLDOWN | MUX_MODE7)  /* uart3_ctsn.gpio5_0 */
++            0x234 (PIN_OUTPUT_PULLUP | MUX_MODE7)  /* uart3_rtsn.gpio5_1 */
++            0x228 (PIN_OUTPUT_PULLUP | MUX_MODE7)  /* uart3_rxd.gpio5_2 */
++            0x22c (PIN_OUTPUT_PULLUP | MUX_MODE7)  /* uart3_txd.gpio5_3 */
++            0x250 (PIN_OUTPUT_PULLUP | MUX_MODE7)  /* spi4_sclk.gpio5_4 */
++            0x254 (PIN_OUTPUT_PULLUP | MUX_MODE7)  /* spi4_d0.gpio5_5 */
++            0x258 (PIN_OUTPUT_PULLUP | MUX_MODE7)  /* spi4_d1.gpio5_6 */
++            0x25c (PIN_OUTPUT_PULLUP | MUX_MODE7)  /* spi4_cs0.gpio5_7 */
++            0x238 (PIN_OUTPUT_PULLUP | MUX_MODE7)  /* gpio5_8.gpio5_8 */
++            0x23c (PIN_OUTPUT_PULLUP | MUX_MODE7)  /* gpio5_9.gpio5_9 */
++            0x240 (PIN_OUTPUT_PULLUP | MUX_MODE7)  /* gpio5_10.gpio5_10 */
++            0x244 (PIN_OUTPUT_PULLUP | MUX_MODE7)  /* gpio5_11.gpio5_11 */
++            0x248 (PIN_OUTPUT_PULLUP | MUX_MODE7)  /* gpio5_12.gpio5_12 */
++            0x24c (PIN_OUTPUT_PULLUP | MUX_MODE7)  /* gpio5_13.gpio5_13 */
++            0x208 (PIN_INPUT_PULLUP | MUX_MODE7)   /* cam0_data0.gpio5_19 */
++            0x20c (PIN_INPUT_PULLUP | MUX_MODE7)   /* cam0_data1.gpio5_20 */
++            0x2c0 (PIN_OUTPUT_PULLDOWN | MUX_MODE9)  /* usb0_drvvbus.gpio5_27 */
++            0x270 (PIN_OUTPUT_PULLDOWN | MUX_MODE9)  /* xdma_event_intr0.gpio5_28 */
++            0x274 (PIN_OUTPUT_PULLUP | MUX_MODE9)    /* xdma_event_intr1.gpio5_29 */
++            0x70 (PIN_INPUT_PULLUP | MUX_MODE9)    /* gpmc_wait0.gpio5_30 */
++            0x74 (PIN_INPUT_PULLUP | MUX_MODE9) /* gpmc_wpn.gpio5_31 */
++        >;
++    };
++
++    i2c0_pins: i2c0_pins {
++        pinctrl-single,pins = <
++            0x188 (PIN_INPUT | SLEWCTRL_FAST | MUX_MODE0)  /* i2c0_sda.i2c0_sda */
++            0x18c (PIN_INPUT | SLEWCTRL_FAST | MUX_MODE0)  /* i2c0_scl.i2c0_scl */
++        >;
++    };
++
++    i2c1_pins: i2c1_pins {
++        pinctrl-single,pins = <
++            0x15c (PIN_INPUT | SLEWCTRL_FAST | MUX_MODE2)  /* spi0_cs0.i2c1_scl */
++            0x158 (PIN_INPUT | SLEWCTRL_FAST | MUX_MODE2)  /* spi0_d1.i2c1_sda  */
++        >;
++    };
++    emmc_pins_default: emmc_pins_default {
++        pinctrl-single,pins = <
++            0x20 (PIN_INPUT_PULLUP | MUX_MODE2) /* gpmc_ad8.mmc1_dat0 */
++            0x24 (PIN_INPUT_PULLUP | MUX_MODE2) /* gpmc_ad9.mmc1_dat1 */
++            0x28 (PIN_INPUT_PULLUP | MUX_MODE2) /* gpmc_ad10.mmc1_dat2 */
++            0x2c (PIN_INPUT_PULLUP | MUX_MODE2) /* gpmc_ad11.mmc1_dat3 */
++            0x30 (PIN_INPUT_PULLUP | MUX_MODE2) /* gpmc_ad12.mmc1_dat4 */
++            0x34 (PIN_INPUT_PULLUP | MUX_MODE2) /* gpmc_ad13.mmc1_dat5 */
++            0x38 (PIN_INPUT_PULLUP | MUX_MODE2) /* gpmc_ad14.mmc1_dat6 */
++            0x3c (PIN_INPUT_PULLUP | MUX_MODE2) /* gpmc_ad15.mmc1_dat7 */
++            0x80 (PIN_INPUT_PULLUP | MUX_MODE2) /* gpmc_csn1.mmc1_clk */
++            0x84 (PIN_INPUT_PULLUP | MUX_MODE2) /* gpmc_csn2.mmc1_cmd */
++        >;
++    };
++
++    emmc_pins_sleep: emmc_pins_sleep {
++        pinctrl-single,pins = <
++            0x20 (PIN_INPUT_PULLDOWN | MUX_MODE7) /* gpmc_ad8.gpio0_22 */
++            0x24 (PIN_INPUT_PULLDOWN | MUX_MODE7) /* gpmc_ad9.gpio0_23 */
++            0x28 (PIN_INPUT_PULLDOWN | MUX_MODE7) /* gpmc_ad10.gpio0_26 */
++            0x2c (PIN_INPUT_PULLDOWN | MUX_MODE7) /* gpmc_ad11.gpio0_27 */
++            0x30 (PIN_INPUT_PULLDOWN | MUX_MODE7) /* gpmc_ad12.gpio1_12 */
++            0x34 (PIN_INPUT_PULLDOWN | MUX_MODE7) /* gpmc_ad13.gpio1_13 */
++            0x38 (PIN_INPUT_PULLDOWN | MUX_MODE7) /* gpmc_ad14.gpio1_14 */
++            0x3c (PIN_INPUT_PULLDOWN | MUX_MODE7) /* gpmc_ad15.gpio1_15 */
++            0x80 (PIN_INPUT_PULLDOWN | MUX_MODE7) /* gpmc_csn1.gpio1_30 */
++            0x84 (PIN_INPUT_PULLDOWN | MUX_MODE7) /* gpmc_csn2.gpio1_31 */
++        >;
++    };
++
++
++
++    cpsw_default: cpsw_default {
++        pinctrl-single,pins = <
++            /* Slave 1 */
++            0x12c (PIN_OUTPUT | MUX_MODE2)  /* mii1_txclk.rmii1_tclk */
++            0x114 (PIN_OUTPUT | MUX_MODE2)  /* mii1_txen.rgmii1_tctl */
++            0x128 (PIN_OUTPUT | MUX_MODE2)  /* mii1_txd0.rgmii1_td0 */
++            0x124 (PIN_OUTPUT | MUX_MODE2)  /* mii1_txd1.rgmii1_td1 */
++            0x120 (PIN_OUTPUT | MUX_MODE2)  /* mii1_txd0.rgmii1_td2 */
++            0x11c (PIN_OUTPUT | MUX_MODE2)  /* mii1_txd1.rgmii1_td3 */
++            0x130 (PIN_INPUT | MUX_MODE2)   /* mii1_rxclk.rmii1_rclk */
++            0x118 (PIN_INPUT | MUX_MODE2)   /* mii1_rxdv.rgmii1_rctl */
++            0x140 (PIN_INPUT | MUX_MODE2)   /* mii1_rxd0.rgmii1_rd0 */
++            0x13c (PIN_INPUT | MUX_MODE2)   /* mii1_rxd1.rgmii1_rd1 */
++            0x138 (PIN_INPUT | MUX_MODE2)   /* mii1_rxd0.rgmii1_rd2 */
++            0x134 (PIN_INPUT | MUX_MODE2)   /* mii1_rxd1.rgmii1_rd3 */
++
++            /* Slave 2 */
++            0x58 (PIN_OUTPUT | MUX_MODE2)   /* gpmc_a6.rgmii2_tclk */
++            0x40 (PIN_OUTPUT | MUX_MODE2)   /* gpmc_a0.rgmii2_tctl */
++            0x54 (PIN_OUTPUT | MUX_MODE2)   /* gpmc_a5.rgmii2_td0 */
++            0x50 (PIN_OUTPUT | MUX_MODE2)   /* gpmc_a4.rgmii2_td1 */
++            0x4c (PIN_OUTPUT | MUX_MODE2)   /* gpmc_a3.rgmii2_td2 */
++            0x48 (PIN_OUTPUT | MUX_MODE2)   /* gpmc_a2.rgmii2_td3 */
++            0x5c (PIN_INPUT | MUX_MODE2)    /* gpmc_a7.rgmii2_rclk */
++            0x44 (PIN_INPUT | MUX_MODE2)    /* gpmc_a1.rgmii2_rtcl */
++            0x6c (PIN_INPUT | MUX_MODE2)    /* gpmc_a11.rgmii2_rd0 */
++            0x68 (PIN_INPUT | MUX_MODE2)    /* gpmc_a10.rgmii2_rd1 */
++            0x64 (PIN_INPUT | MUX_MODE2)    /* gpmc_a9.rgmii2_rd2 */
++            0x60 (PIN_INPUT | MUX_MODE2)    /* gpmc_a8.rgmii2_rd3 */
++        >;
++    };
++
++    cpsw_sleep: cpsw_sleep {
++        pinctrl-single,pins = <
++            /* Slave 1 reset value */
++            0x12c (PIN_INPUT_PULLDOWN | MUX_MODE7)
++            0x114 (PIN_INPUT_PULLDOWN | MUX_MODE7)
++            0x128 (PIN_INPUT_PULLDOWN | MUX_MODE7)
++            0x124 (PIN_INPUT_PULLDOWN | MUX_MODE7)
++            0x120 (PIN_INPUT_PULLDOWN | MUX_MODE7)
++            0x11c (PIN_INPUT_PULLDOWN | MUX_MODE7)
++            0x130 (PIN_INPUT_PULLDOWN | MUX_MODE7)
++            0x118 (PIN_INPUT_PULLDOWN | MUX_MODE7)
++            0x140 (PIN_INPUT_PULLDOWN | MUX_MODE7)
++            0x13c (PIN_INPUT_PULLDOWN | MUX_MODE7)
++            0x138 (PIN_INPUT_PULLDOWN | MUX_MODE7)
++            0x134 (PIN_INPUT_PULLDOWN | MUX_MODE7)
++
++            /* Slave 2 reset value */
++            0x58 (PIN_INPUT_PULLDOWN | MUX_MODE7)
++            0x40 (PIN_INPUT_PULLDOWN | MUX_MODE7)
++            0x54 (PIN_INPUT_PULLDOWN | MUX_MODE7)
++            0x50 (PIN_INPUT_PULLDOWN | MUX_MODE7)
++            0x4c (PIN_INPUT_PULLDOWN | MUX_MODE7)
++            0x48 (PIN_INPUT_PULLDOWN | MUX_MODE7)
++            0x5c (PIN_INPUT_PULLDOWN | MUX_MODE7)
++            0x44 (PIN_INPUT_PULLDOWN | MUX_MODE7)
++            0x6c (PIN_INPUT_PULLDOWN | MUX_MODE7)
++            0x68 (PIN_INPUT_PULLDOWN | MUX_MODE7)
++            0x64 (PIN_INPUT_PULLDOWN | MUX_MODE7)
++            0x60 (PIN_INPUT_PULLDOWN | MUX_MODE7)
++        >;
++    };
++
++    davinci_mdio_default: davinci_mdio_default {
++        pinctrl-single,pins = <
++            /* MDIO */
++            0x148 (PIN_INPUT | SLEWCTRL_FAST | MUX_MODE0)   /* mdio_data.mdio_data */
++            0x14c (PIN_OUTPUT | MUX_MODE0)          /* mdio_clk.mdio_clk */
++        >;
++    };
++
++    davinci_mdio_sleep: davinci_mdio_sleep {
++        pinctrl-single,pins = <
++            /* MDIO reset value */
++            0x148 (PIN_INPUT_PULLDOWN | MUX_MODE7)
++            0x14c (PIN_INPUT_PULLDOWN | MUX_MODE7)
++        >;
++    };
++
++
++    qspi_pins: qspi_pins {
++        pinctrl-single,pins = <
++            0x7c (PIN_OUTPUT | MUX_MODE3)   /* gpmc_csn0.qspi_csn */
++            0x88 (PIN_OUTPUT | MUX_MODE2)   /* gpmc_csn3.qspi_clk */
++            0x90 (PIN_INPUT | MUX_MODE3)    /* gpmc_advn_ale.qspi_d0 */
++            0x94 (PIN_INPUT | MUX_MODE3)    /* gpmc_oen_ren.qspi_d1 */
++            0x98 (PIN_INPUT | MUX_MODE3)    /* gpmc_wen.qspi_d2 */
++            0x9c (PIN_INPUT | MUX_MODE3)    /* gpmc_be0n_cle.qspi_d3 */
++        >;
++    };
++
++    uart0_pins: uart0_pins {
++        pinctrl-single,pins = <
++            0x170 (PIN_INPUT | MUX_MODE0)           /* uart0_rxd */
++            0x174 (PIN_OUTPUT_PULLDOWN | MUX_MODE0)         /* uart0_txd */
++        >;
++    };
++
++    uart1_pins: uart1_pins {
++        pinctrl-single,pins = <
++            0x180 (PIN_INPUT | MUX_MODE0)       /* uart1_rxd.uart1_rxd */
++            0x184 (PIN_OUTPUT_PULLDOWN | MUX_MODE0) /* uart1_txd.uart1_txd */
++            0x178 (PIN_INPUT_PULLUP | MUX_MODE0)    /* uart1_ctsn.uart1_ctsn */
++            0x17c (PIN_OUTPUT_PULLDOWN | MUX_MODE0) /* uart1_rtsn.uart1_rtsn */
++            0xf8 (PIN_INPUT | MUX_MODE4)        /* mmc0_dat1.uart1_dtrn */
++            0xf4 (PIN_INPUT | MUX_MODE4)        /* mmc0_dat1.uart1_dsrn */
++        >;
++    };
++
++    uart2_pins: uart2_pins {
++        pinctrl-single,pins = <
++            0x10c (PIN_INPUT | MUX_MODE6)           /* mii1_crs.uart2_rxd */
++            0x110 (PIN_OUTPUT_PULLDOWN | MUX_MODE6)     /* mii1_rx_er.uart2_txd */          
++            >;
++    };
++        
++    pruss_pins: pruss_pins {
++        pinctrl-single,pins = <
++            0x0B4 (PIN_OUTPUT_PULLDOWN | MUX_MODE5)  /* DSS_DATA5.pr1_pru0_gpo5 ARM_BLADE_THROTTLE */
++            >;
++
++    };
++};
++
++
++&pruss1 {
++    status = "okay";
++        pinctrl-names = "default";
++        pinctrl-0 = <&pruss_pins>;
++    };
++
++&i2c0 {
++    status = "okay";
++    pinctrl-names = "default";
++    pinctrl-0 = <&i2c0_pins>;
++    /* Per the TI patch 9177611, SoC does not guarantee 50% duty cycle
++     * for the I2C SCL. This results in PMIC tps65218 to silently fail 
++     * DVFS requests from the kernel cauing a myriad of issues.
++     * Workaround is to go to 100 kHz to guarantee a 1uS minimum high period
++     * for SCL that is required by the PMIC.
++     * Addresses Microsoft TFS issue 66032
++     */
++    clock-frequency = <100000>;
++
++    tps@24 {
++        compatible = "ti,tps65218";
++        reg = <0x24>;
++        interrupts = <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
++        interrupt-controller;
++        #interrupt-cells = <2>;
++
++        dcdc1: regulator-dcdc1 {
++            compatible = "ti,tps65218-dcdc1";
++            /* VDD_CORE limits min of OPP50 and max of OPP100 */
++            regulator-name = "vdd_core";
++            regulator-min-microvolt = <912000>;
++            regulator-max-microvolt = <1144000>;
++            regulator-boot-on;
++            regulator-always-on;
++        };
++
++        dcdc2: regulator-dcdc2 {
++            compatible = "ti,tps65218-dcdc2";
++            /* VDD_MPU limits min of OPP50 and max of OPP_NITRO */
++            regulator-name = "vdd_mpu";
++            regulator-min-microvolt = <912000>;
++            regulator-max-microvolt = <1378000>;
++            regulator-boot-on;
++            regulator-always-on;
++        };
++
++        dcdc3: regulator-dcdc3 {
++            compatible = "ti,tps65218-dcdc3";
++            regulator-name = "vdds_ddr";
++            regulator-min-microvolt = <1350000>;
++            regulator-max-microvolt = <1350000>;
++            regulator-boot-on;
++            regulator-always-on;
++            regulator-state-mem {
++                regulator-on-in-suspend;
++            };
++            regulator-state-disk {
++                regulator-off-in-suspend;
++            };
++        };
++
++        dcdc4: regulator-dcdc4 {
++            compatible = "ti,tps65218-dcdc4";
++            regulator-name = "v3_3d";
++            regulator-min-microvolt = <3300000>;
++            regulator-max-microvolt = <3300000>;
++            regulator-boot-on;
++            regulator-always-on;
++        };
++
++        dcdc5: regulator-dcdc5 {
++            compatible = "ti,tps65218-dcdc5";
++            regulator-name = "v1_0bat";
++            regulator-min-microvolt = <1000000>;
++            regulator-max-microvolt = <1000000>;
++            regulator-boot-on;
++            regulator-always-on;
++            regulator-state-mem {
++                regulator-on-in-suspend;
++            };
++        };
++
++        dcdc6: regulator-dcdc6 {
++            compatible = "ti,tps65218-dcdc6";
++            regulator-name = "v1_8bat";
++            regulator-min-microvolt = <1800000>;
++            regulator-max-microvolt = <1800000>;
++            regulator-boot-on;
++            regulator-always-on;
++            regulator-state-mem {
++                regulator-on-in-suspend;
++            };
++        };
++
++        ldo1: regulator-ldo1 {
++            compatible = "ti,tps65218-ldo1";
++            regulator-name = "v1_8d";
++            regulator-min-microvolt = <1800000>;
++            regulator-max-microvolt = <1800000>;
++            regulator-boot-on;
++            regulator-always-on;
++        };
++    };
++
++    lm25066@10 {
++        compatible = "ti,lm25066";
++        reg = <0x10>;
++    };
++
++    at24@50 {
++        compatible = "at24,24c64";
++        reg = <0x50>;
++    };
++
++    pca9535@20 {
++        compatible = "nxp,pca9535";
++        reg = <0x20>;
++    };
++
++    hdc1080@40 {
++        compatible = "ti,hdc1080";
++        reg = <0x40>;
++    };
++};
++
++&i2c1 {
++    status = "okay";
++    pinctrl-names = "default";
++    pinctrl-0 = <&i2c1_pins>;
++    /* Per the TI patch 9177611, SoC does not guarantee 50% duty cycle
++     * for the I2C SCL. This results in PMIC tps65218 to silently fail 
++     * DVFS requests from the kernel cauing a myriad of issues.
++     * Workaround is to go to 100 kHz to guarantee a 1uS minimum high period
++     * for SCL that is required by the PMIC.
++     * Addresses Microsoft TFS issue 66032
++     */
++    clock-frequency = <100000>;
++
++    pca9535@21 {
++	compatible = "nxp,pca9535";
++        reg = <0x21>;
++    };
++    
++    at24-0@50 {
++        compatible = "at24,24c64";
++        reg = <0x50>;
++    };
++
++    at24-1@51 {
++        compatible = "at24,24c64";
++        reg = <0x51>;
++    };
++
++    at24-2@52 {
++        compatible = "at24,24c64";
++        reg = <0x52>;
++    };
++};
++
++&epwmss0 {
++    status = "okay";
++};
++
++&tscadc {
++    status = "okay";
++
++    adc {
++        ti,adc-channels = <0 1 2 3 4 5 6 7>;
++    };
++};
++
++&adc1 {
++    status = "okay";
++    ti,adc-channels = <0 1 2 3 4 5 6 7>;
++};
++
++&gpio0 {
++    pinctrl-names = "default";
++    pinctrl-0 = <&gpio0_pins>;
++    status = "okay";
++};
++
++&gpio1 {
++    pinctrl-names = "default";
++    pinctrl-0 = <&gpio1_pins>;
++    status = "okay";
++};
++
++&gpio2 {
++    pinctrl-names = "default";
++    pinctrl-0 = <&gpio2_pins>;
++    status = "okay";
++};
++
++&gpio3 {
++    pinctrl-names = "default";
++    pinctrl-0 = <&gpio3_pins>;
++    status = "okay";
++};
++
++&gpio4 {
++    pinctrl-names = "default";
++    pinctrl-0 = <&gpio4_pins>;
++    status = "okay";
++};
++
++&gpio5 {
++    pinctrl-names = "default";
++    pinctrl-0 = <&gpio5_pins>;
++    status = "okay";
++};
++
++/* eMMC sits on mmc2 */
++&mmc2 {
++    vmmc-supply = <&vmmcsd_fixed>;
++    bus-width = <8>;
++    pinctrl-names = "default";
++    pinctrl-0 = <&emmc_pins_default>;
++    pinctrl-1 = <&emmc_pins_sleep>;
++    ti,non-removable;
++    status = "okay";
++};
++
++&uart0 {
++    status = "okay";
++    pinctrl-names = "default";
++    pinctrl-0 = <&uart0_pins>;
++};
++
++&uart1 {
++    status = "okay";
++    pinctrl-names = "default";
++    pinctrl-0 = <&uart1_pins>;
++};
++
++&uart2 {
++    status = "okay";
++    pinctrl-names = "default";
++    pinctrl-0 = <&uart2_pins>;
++};
++
++&edma {
++    ti,edma-xbar-event-map = /bits/ 16 <1 30
++                        2 31>;
++};
++
++&usb2_phy1 {
++    status = "disabled";
++};
++
++&usb1 {
++    status = "disabled";
++    dr_mode = "otg";
++    /*pinctrl-names = "default";
++    pinctrl-0 = <&usb1_pins>;*/
++};
++
++&usb2_phy2 {
++    status = "disabled";
++};
++
++&usb2 {
++    status = "disabled";
++    dr_mode = "host";
++    /*pinctrl-names = "default";
++    pinctrl-0 = <&usb2_pins>;*/
++};
++
++&qspi {
++    status = "okay";
++    pinctrl-names = "default";
++    pinctrl-0 = <&qspi_pins>;
++
++    spi-max-frequency = <48000000>;
++    m25p80@0 {
++        compatible = "mx66l51235l";
++        spi-max-frequency = <48000000>;
++        reg = <0>;
++        spi-cpol;
++        spi-cpha;
++        spi-tx-bus-width = <1>;
++        spi-rx-bus-width = <4>;
++        #address-cells = <1>;
++        #size-cells = <1>;
++
++        /* MTD partition table.
++         * The ROM checks the first 512KiB
++         * for a valid file to boot(XIP).
++         */
++        partition@0 {
++            label = "QSPI.U-BOOT";
++            reg = <0x00000000 0x000090000>;
++        };
++        partition@1 {
++            label = "QSPI.U-BOOT-backup";
++            reg = <0x00090000 0x00070000>;
++        };
++        partition@2 {
++            label = "QSPI.U-BOOT-env";
++            reg = <0x00100000 0x00010000>;
++        };
++        partition@3 {
++            label = "QSPI.FDT";
++            reg = <0x00110000 0x00010000>;
++        };
++        partition@4 {
++            label = "QSPI.KERNEL-zImage";
++            reg = <0x00120000 0x0800000>;
++        };
++        partition@5 {
++            label = "QSPI.FILESYSTEM";
++            reg = <0x00920000 0x36E0000>;
++        };
++    };
++};
++
++&mac {
++    slaves = <2>;
++    pinctrl-names = "default", "sleep";
++    pinctrl-0 = <&cpsw_default>;
++    pinctrl-1 = <&cpsw_sleep>;
++    dual_emac = <1>;
++    status = "okay";
++};
++
++&davinci_mdio {
++    pinctrl-names = "default", "sleep";
++    pinctrl-0 = <&davinci_mdio_default>;
++    pinctrl-1 = <&davinci_mdio_sleep>;
++    status = "okay";
++};
++
++&cpsw_emac0 {
++    phy_id = <&davinci_mdio>, <1>;
++    phy-mode = "rgmii";
++    dual_emac_res_vlan = <1>;
++};
++
++&cpsw_emac1 {
++    phy_id = <&davinci_mdio>, <2>;
++    phy-mode = "rgmii";
++    dual_emac_res_vlan = <2>;
++};
++
++&elm {
++    status = "okay";
++};
++
++
++&rtc {
++    status = "okay";
++    ext-clk-src;
++};
++
++&wdt {
++    status = "okay";
++};
++
++&cpu {
++    cpu0-supply = <&dcdc2>;
++};
++
++&wkup_m3_ipc {
++    ti,scale-data-fw = "am43x-evm-scale-data.bin";
++};
+diff --git a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+index d2253dd..f2f0151 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_43xx_data.c
+@@ -23,6 +23,9 @@
+ #include "hdq1w.h"
+ #include "soc.h"
+ 
++
++#define CLKCTRL(oh, clkctrl) ((oh).prcm.omap4.clkctrl_offs = (clkctrl)) //FXN_LAWRENCE_20160517_FXNXXXXXX001
++
+ /* IP blocks */
+ static struct omap_hwmod am43xx_emif_hwmod = {
+ 	.name		= "emif",
+@@ -463,6 +466,39 @@ static struct omap_hwmod am43xx_adc_tsc_hwmod = {
+ 	},
+ };
+ 
++//>>>FXN_LAWRENCE_20160517_FXNXXXXXX001
++static struct omap_hwmod_class_sysconfig am437x_adc1_sysc = {
++        .rev_offs   = 0x00,
++        .sysc_offs  = 0x10,
++        .sysc_flags = SYSC_HAS_SIDLEMODE,
++        .idlemodes  = (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART |
++                                   SIDLE_SMART_WKUP),
++        .sysc_fields = &omap_hwmod_sysc_type2,
++};
++
++static struct omap_hwmod_class am437x_adc1_hwmod_class = {
++        .name = "adc1",
++        .sysc = &am437x_adc1_sysc,
++};
++
++static struct omap_hwmod am437x_adc1_hwmod = {
++        .name       = "adc1",
++        .class      = &am437x_adc1_hwmod_class,
++        .clkdm_name = "l3s_clkdm",
++        .main_clk   = "l3s_gclk",
++        .prcm       = {
++                .omap4  = {
++                        .modulemode = MODULEMODE_SWCTRL,
++                },
++        },
++};
++//<<<FXN_LAWRENCE_20160517_FXNXXXXXX001
++
++
++
++
++
++
+ static struct omap_hwmod_class_sysconfig am43xx_des_sysc = {
+ 	.rev_offs	= 0x30,
+ 	.sysc_offs	= 0x34,
+@@ -699,6 +735,20 @@ static struct omap_hwmod_ocp_if am43xx_l4_wkup__adc_tsc = {
+ 	.user           = OCP_USER_MPU,
+ };
+ 
++//>>>FXN_LAWRENCE_20160517_FXNXXXXXX001
++static struct omap_hwmod_ocp_if am437x_l3_s__adc1 = {
++        .master     = &am33xx_l4_wkup_hwmod,
++        .slave      = &am437x_adc1_hwmod,
++        .clk        = "l4ls_gclk",
++        //.addr       = am437x_adc1_addrs,
++        .user       = OCP_USER_MPU,
++};
++
++//<<<FXN_LAWRENCE_20160517_FXNXXXXXX001
++
++
++
++
+ static struct omap_hwmod_ocp_if am43xx_l4_hs__cpgmac0 = {
+ 	.master		= &am43xx_l4_hs_hwmod,
+ 	.slave		= &am33xx_cpgmac0_hwmod,
+@@ -985,6 +1035,7 @@ static struct omap_hwmod_ocp_if *am43xx_hwmod_ocp_ifs[] __initdata = {
+ 	&am43xx_l4_wkup__gpio0,
+ 	&am43xx_l4_wkup__wd_timer1,
+ 	&am43xx_l4_wkup__adc_tsc,
++	&am437x_l3_s__adc1, //FXN_LAWRENCE_20160517_FXNXXXXXX001
+ 	&am43xx_l3_s__qspi,
+ 	&am33xx_l4_per__dcan0,
+ 	&am33xx_l4_per__dcan1,
+@@ -1062,7 +1113,8 @@ static struct omap_hwmod_ocp_if *am43xx_rtc_hwmod_ocp_ifs[] __initdata = {
+ int __init am43xx_hwmod_init(void)
+ {
+ 	int ret;
+-
++	
++	CLKCTRL(am437x_adc1_hwmod, AM43XX_CM_PER_ADC1_CLKCTRL_OFFSET); //FXN_LAWRENCE_20160517_FXNXXXXXX001
+ 	omap_hwmod_am43xx_reg();
+ 	omap_hwmod_init();
+ 	ret = omap_hwmod_register_links(am43xx_hwmod_ocp_ifs);
+diff --git a/arch/arm/mach-omap2/prcm43xx.h b/arch/arm/mach-omap2/prcm43xx.h
+index 4768ff2..40ca35d 100644
+--- a/arch/arm/mach-omap2/prcm43xx.h
++++ b/arch/arm/mach-omap2/prcm43xx.h
+@@ -109,6 +109,7 @@
+ #define AM43XX_CM_WKUP_I2C0_CLKCTRL_OFFSET		0x0340
+ #define AM43XX_CM_WKUP_GPIO0_CLKCTRL_OFFSET		0x0368
+ #define AM43XX_CM_WKUP_ADC_TSC_CLKCTRL_OFFSET		0x0120
++#define AM43XX_CM_PER_ADC1_CLKCTRL_OFFSET               0x0230 //FXN_LAWRENCE_20160517_FXNXXXXXX001
+ #define AM43XX_CM_WKUP_WDT1_CLKCTRL_OFFSET		0x0338
+ #define AM43XX_CM_WKUP_L4WKUP_CLKCTRL_OFFSET		0x0220
+ #define AM43XX_CM_RTC_RTC_CLKCTRL_OFFSET		0x0020
+diff --git a/drivers/iio/adc/Makefile b/drivers/iio/adc/Makefile
+index 3930e63..ea20a2f 100644
+--- a/drivers/iio/adc/Makefile
++++ b/drivers/iio/adc/Makefile
+@@ -30,7 +30,7 @@ obj-$(CONFIG_QCOM_SPMI_VADC) += qcom-spmi-vadc.o
+ obj-$(CONFIG_ROCKCHIP_SARADC) += rockchip_saradc.o
+ obj-$(CONFIG_TI_ADC081C) += ti-adc081c.o
+ obj-$(CONFIG_TI_ADC128S052) += ti-adc128s052.o
+-obj-$(CONFIG_TI_AM335X_ADC) += ti_am335x_adc.o
++obj-$(CONFIG_TI_AM335X_ADC) += ti_am335x_adc.o ti_am437x_adc1.o
+ obj-$(CONFIG_TWL4030_MADC) += twl4030-madc.o
+ obj-$(CONFIG_TWL6030_GPADC) += twl6030-gpadc.o
+ obj-$(CONFIG_VF610_ADC) += vf610_adc.o
+diff --git a/drivers/iio/adc/ti_am437x_adc1.c b/drivers/iio/adc/ti_am437x_adc1.c
+new file mode 100644
+index 0000000..22535d9
+--- /dev/null
++++ b/drivers/iio/adc/ti_am437x_adc1.c
+@@ -0,0 +1,571 @@
++/*
++ * TI ADC IIO driver
++ *
++ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/init.h>
++#include <linux/kernel.h>
++#include <linux/err.h>
++#include <linux/module.h>
++#include <linux/slab.h>
++#include <linux/interrupt.h>
++#include <linux/platform_device.h>
++#include <linux/io.h>
++#include <linux/clk.h>
++#include <linux/iio/iio.h>
++#include <linux/regmap.h>
++#include <linux/of.h>
++#include <linux/of_device.h>
++#include <linux/iio/machine.h>
++#include <linux/iio/driver.h>
++#include <linux/pm_runtime.h>
++#include <linux/delay.h>
++
++#include <linux/mfd/ti_am437x_adc1.h>
++
++static const struct regmap_config ti_adc_regmap_config = {
++	.name = "ti_adc1",
++	.reg_bits = 32,
++	.reg_stride = 4,
++	.val_bits = 32,
++};
++
++/* Ivan 20160704: Config ADC1 registers */
++static int configADC_init(void)
++{
++        static void __iomem* my_io;
++
++	pr_info("20160704: Config ADC1 registers\n");
++        pr_info("=== Starting initial ADC ===\n");
++        //--- initial ADC : Gavin ---
++        my_io = ioremap(0x44DF424C,8);
++        iowrite32(0x00,my_io);
++        pr_info("PRCMCMCLKSELADC1CLK:0x%X\n", ioread32(my_io));
++
++        my_io = ioremap(0x44DF8A30,8);
++        iowrite32(0x02,my_io);
++        pr_info("ADC1CLKCTRL:0x%X\n", ioread32(my_io));
++
++        my_io = ioremap(0x4834C040,8);
++        iowrite32(0x66,my_io);
++        pr_info("ADC1CTRL:0x%X\n", ioread32(my_io));
++
++        //--- ForceIdle ---
++        my_io = ioremap(0x4834C010,8);
++        iowrite32(0x00,my_io);
++        pr_info("ADC1SYSCONFIG:0x%X\n", ioread32(my_io));
++
++        my_io = ioremap(0x4834C04C,8);
++        iowrite32(0x07,my_io);
++        pr_info("ADC1Clk:0x%X\n", ioread32(my_io));
++
++        //--- CONFIG 1-6 ---
++        my_io = ioremap(0x4834C064,8);
++        iowrite32(0x11,my_io);
++        pr_info("ADC1STEPCONFIG1:0x%X\n", ioread32(my_io));
++
++        my_io = ioremap(0x4834C06C,8);
++        iowrite32(0x80011,my_io);
++        pr_info("ADC1STEPCONFIG2:0x%X\n", ioread32(my_io));
++
++        my_io = ioremap(0x4834C074,8);
++        iowrite32(0x100011,my_io);
++        pr_info("ADC1STEPCONFIG3:0x%X\n", ioread32(my_io));
++
++        my_io = ioremap(0x4834C07C,8);
++        iowrite32(0x180011,my_io);
++        pr_info("ADC1STEPCONFIG4:0x%X\n", ioread32(my_io));
++
++        my_io = ioremap(0x4834C084,8);
++        iowrite32(0x200011,my_io);
++        pr_info("ADC1STEPCONFIG5:0x%X\n", ioread32(my_io));
++
++        my_io = ioremap(0x4834C08C,8);
++        iowrite32(0x280011,my_io);
++        pr_info("ADC1STEPCONFIG6:0x%X\n", ioread32(my_io));
++
++        my_io = ioremap(0x4834C054,8);
++        iowrite32(0x07E,my_io);
++        pr_info("ADC1STEPEN:0x%X\n", ioread32(my_io));
++
++        my_io = ioremap(0x4834C02C,8);
++        iowrite32(0x02,my_io);
++        pr_info("ADC1IRQENSET:0x%X\n", ioread32(my_io));
++
++        my_io = ioremap(0x4834C040,8);
++        iowrite32(0x67,my_io);
++        pr_info("ADC1CTRL:0x%X\n", ioread32(my_io));
++
++        return 0;
++}
++
++static unsigned int tiadc_readl(struct ti_adc1_dev *adc, unsigned int reg)
++{
++	return readl(adc->adc_base + reg);
++}
++
++static void tiadc_writel(struct ti_adc1_dev *adc, unsigned int reg,
++					unsigned int val)
++{
++	writel(val, adc->adc_base + reg);
++}
++
++static void am437x_adc_se_update(struct ti_adc1_dev *adc, u32 val)
++{
++	unsigned long flags;
++
++	spin_lock_irqsave(&adc->reg_lock, flags);
++	if (!adc->adc_pending)
++		tiadc_writel(adc, REG_SE, adc->reg_se_cache | val);
++	spin_unlock_irqrestore(&adc->reg_lock, flags);
++}
++
++static void am437x_adc_se_set_cont(struct ti_adc1_dev *adc, u32 val)
++{
++	unsigned long flags;
++
++	spin_lock_irqsave(&adc->reg_lock, flags);
++	adc->reg_se_cache |= val;
++	spin_unlock_irqrestore(&adc->reg_lock, flags);
++	am437x_adc_se_update(adc, 0);
++}
++
++static void am437x_adc_se_set_once(struct ti_adc1_dev *adc, u32 val)
++{
++	unsigned long flags;
++
++	spin_lock_irqsave(&adc->reg_lock, flags);
++	adc->adc_pending = true;
++	tiadc_writel(adc, REG_SE, adc->reg_se_cache | val);
++	spin_unlock_irqrestore(&adc->reg_lock, flags);
++}
++
++static void am437x_adc_se_done(struct ti_adc1_dev *adc)
++{
++	unsigned long flags;
++
++	spin_lock_irqsave(&adc->reg_lock, flags);
++	adc->adc_pending = false;
++	spin_unlock_irqrestore(&adc->reg_lock, flags);
++}
++
++static void am437x_adc_se_clr(struct ti_adc1_dev *adc, u32 val)
++{
++	unsigned long flags;
++
++	spin_lock_irqsave(&adc->reg_lock, flags);
++	adc->reg_se_cache &= ~val;
++	spin_unlock_irqrestore(&adc->reg_lock, flags);
++	am437x_adc_se_update(adc, 0);
++}
++
++static u32 get_adc_step_mask(struct ti_adc1_dev *adc_dev)
++{
++	u32 step_en;
++
++	step_en = ((1 << adc_dev->channels) - 1);
++	step_en <<= TOTAL_STEPS - adc_dev->channels + 1;
++	return step_en;
++}
++
++static u32 get_adc_chan_step_mask(struct ti_adc1_dev *adc_dev,
++		struct iio_chan_spec const *chan)
++{
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(adc_dev->channel_step); i++) {
++		if (chan->channel == adc_dev->channel_line[i]) {
++			u32 step;
++
++			step = adc_dev->channel_step[i];
++			/* +1 for the charger */
++			return 1 << (step + 1);
++		}
++	}
++	WARN_ON(1);
++	return 0;
++}
++
++static void tiadc_step_config(struct ti_adc1_dev *adc_dev)
++{
++	unsigned int stepconfig;
++	int i, steps;
++
++	/*
++	 * There are 16 configurable steps and 8 analog input
++	 * lines available
++	 *
++	 * Steps backwards i.e. from 16 towards 0 are used by ADC
++	 * depending on number of input lines needed.
++	 * Channel would represent which analog input
++	 * needs to be given to ADC to digitalize data.
++	 */
++
++	steps = TOTAL_STEPS - adc_dev->channels;
++	stepconfig = STEPCONFIG_AVG_16 | STEPCONFIG_FIFO1 | STEPCHARGE_RFP(0x3);
++	stepconfig &= ~STEPCONFIG_DIFFCNTRL;
++
++	for (i = 0; i < adc_dev->channels; i++) {
++		int chan;
++
++		chan = adc_dev->channel_line[i];
++		tiadc_writel(adc_dev, REG_STEPCONFIG(steps),
++				stepconfig | STEPCONFIG_INP(chan));
++		tiadc_writel(adc_dev, REG_STEPDELAY(steps),
++				STEPCONFIG_OPENDLY);
++		adc_dev->channel_step[i] = steps;
++		steps++;
++	}
++}
++
++static const char * const chan_name_ain[] = {
++	"AIN0",
++	"AIN1",
++	"AIN2",
++	"AIN3",
++	"AIN4",
++	"AIN5",
++	"AIN6",
++	"AIN7",
++};
++
++static int tiadc_channel_init(struct iio_dev *indio_dev, int channels)
++{
++	struct ti_adc1_dev *adc_dev = iio_priv(indio_dev);
++	struct iio_chan_spec *chan_array;
++	struct iio_chan_spec *chan;
++	int i;
++
++	indio_dev->num_channels = channels;
++	chan_array = kcalloc(channels,
++			sizeof(struct iio_chan_spec), GFP_KERNEL);
++	if (chan_array == NULL)
++		return -ENOMEM;
++
++	chan = chan_array;
++	for (i = 0; i < channels; i++, chan++) {
++
++		chan->type = IIO_VOLTAGE;
++		chan->indexed = 1;
++		chan->channel = adc_dev->channel_line[i];
++		chan->info_mask_separate = BIT(IIO_CHAN_INFO_RAW);
++		chan->datasheet_name = chan_name_ain[chan->channel];
++		chan->scan_type.sign = 'u';
++		chan->scan_type.realbits = 12;
++		chan->scan_type.storagebits = 32;
++	}
++
++	indio_dev->channels = chan_array;
++
++	return 0;
++}
++
++static void tiadc_channels_remove(struct iio_dev *indio_dev)
++{
++	kfree(indio_dev->channels);
++}
++
++static int tiadc_read_raw(struct iio_dev *indio_dev,
++		struct iio_chan_spec const *chan,
++		int *val, int *val2, long mask)
++{
++	struct ti_adc1_dev *adc_dev = iio_priv(indio_dev);
++	int i, map_val;
++	unsigned int fifo1count, read, stepid;
++	u32 step = UINT_MAX;
++	bool found = false;
++	u32 step_en;
++	unsigned long timeout = jiffies + usecs_to_jiffies
++				(IDLE_TIMEOUT * adc_dev->channels);
++
++	printk(KERN_ERR "%s\n", __func__);
++	step_en = get_adc_chan_step_mask(adc_dev, chan);
++	if (!step_en)
++		return -EINVAL;
++
++	am437x_adc_se_set_once(adc_dev, step_en);
++
++	/* Wait for Fifo threshold interrupt */
++	while (!(tiadc_readl(adc_dev, REG_RAWIRQSTATUS) & IRQENB_FIFO1THRES)) {
++		if (time_after(jiffies, timeout)) {
++			am437x_adc_se_done(adc_dev);
++			return -EAGAIN;
++		}
++	}
++	map_val = chan->channel + TOTAL_CHANNELS;
++
++	/*
++	 * When the sub-system is first enabled,
++	 * the sequencer will always start with the
++	 * lowest step (1) and continue until step (16).
++	 * For ex: If we have enabled 4 ADC channels and
++	 * currently use only 1 out of them, the
++	 * sequencer still configures all the 4 steps,
++	 * leading to 3 unwanted data.
++	 * Hence we need to flush out this data.
++	 */
++
++	for (i = 0; i < ARRAY_SIZE(adc_dev->channel_step); i++) {
++		if (chan->channel == adc_dev->channel_line[i]) {
++			step = adc_dev->channel_step[i];
++			break;
++		}
++	}
++	if (WARN_ON_ONCE(step == UINT_MAX)) {
++		am437x_adc_se_done(adc_dev);
++		return -EINVAL;
++	}
++
++	fifo1count = tiadc_readl(adc_dev, REG_FIFO1CNT);
++	for (i = 0; i < fifo1count; i++) {
++		read = tiadc_readl(adc_dev, REG_FIFO1);
++		stepid = read & FIFOREAD_CHNLID_MASK;
++		stepid = stepid >> 0x10;
++
++		if (stepid == map_val) {
++			read = (read & FIFOREAD_DATA_MASK) >> 1;
++			found = true;
++			*val = read;
++		}
++	}
++
++	tiadc_writel(adc_dev, REG_IRQSTATUS, IRQENB_FIFO1THRES);
++	am437x_adc_se_done(adc_dev);
++
++	if (found == false)
++		return -EBUSY;
++
++	return IIO_VAL_INT;
++}
++
++static const struct iio_info tiadc_info = {
++	.read_raw = &tiadc_read_raw,
++	.driver_module = THIS_MODULE,
++};
++
++static int tiadc_probe(struct platform_device *pdev)
++{
++	struct iio_dev		*indio_dev;
++	struct ti_adc1_dev	*ti_adc1;
++	struct device_node	*node = pdev->dev.of_node;
++	struct property		*prop;
++	struct resource     *res;
++	struct clk          *clk;
++	const __be32		*cur;
++	int			err;
++	u32			val;
++	int			channels = 0;
++	int         clk_value, clock_rate;
++
++	if (!node) {
++		dev_err(&pdev->dev, "Could not find valid DT data.\n");
++		return -EINVAL;
++	}
++
++	indio_dev = devm_iio_device_alloc(&pdev->dev,
++					  sizeof(struct ti_adc1_dev));
++	if (indio_dev == NULL) {
++		dev_err(&pdev->dev, "failed to allocate iio device\n");
++		return -ENOMEM;
++	}
++	ti_adc1 = iio_priv(indio_dev);
++	ti_adc1->dev = &pdev->dev;
++
++	of_property_for_each_u32(node, "ti,adc-channels", prop, cur, val) {
++		ti_adc1->channel_line[channels] = val;
++		channels++;
++	}
++	ti_adc1->channels = channels;
++
++	/* Get memory resource */
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res) {
++		dev_err(&pdev->dev, "no memory resource defined.\n");
++		return -EINVAL;
++	}
++
++	err = platform_get_irq(pdev, 0);
++	if (err < 0) {
++		dev_err(&pdev->dev, "no irq ID is specified.\n");
++		return err;
++	} else {
++		ti_adc1->irq = err;
++	}
++
++	/* Request memory region */
++	res = devm_request_mem_region(&pdev->dev,
++								  res->start, resource_size(res), pdev->name);
++	if (!res) {
++		dev_err(&pdev->dev, "failed to reserve registers.\n");
++		return -EBUSY;
++	}
++
++	/* IO memory remap */
++	ti_adc1->adc_base = devm_ioremap(&pdev->dev,
++									 res->start, resource_size(res));
++	if (!ti_adc1->adc_base) {
++		dev_err(&pdev->dev, "failed to map register.\n");
++		return -ENOMEM;
++	}
++
++	/* Initialize mmio */
++	ti_adc1->regmap_adc = devm_regmap_init_mmio(&pdev->dev,
++											   ti_adc1->adc_base,
++											   &ti_adc_regmap_config);
++	if (IS_ERR(ti_adc1->regmap_adc)) {
++		dev_err(&pdev->dev, "regmap init failed\n");
++		err = PTR_ERR(ti_adc1->regmap_adc);
++		return err;
++	}
++
++	/* Initialize spin lock */
++	spin_lock_init(&ti_adc1->reg_lock);
++	pm_runtime_enable(&pdev->dev);
++	pm_runtime_get_sync(&pdev->dev);
++
++	/* Clock setting */
++	clk = clk_get(&pdev->dev, "l3s_gclk");
++	if (IS_ERR(clk)) {
++		dev_err(&pdev->dev, "failed to get adc fck\n");
++		err = PTR_ERR(clk);
++		goto err_disable_clk;
++	}
++
++	clock_rate = clk_get_rate(clk);
++	clk_put(clk);
++	clk_value = clock_rate / ADC_CLK;
++	/* ADC1_CLKDIV needs to be configured to the value minus 1 */
++	clk_value = clk_value - 1;
++	tiadc_writel(ti_adc1, REG_CLKDIV, clk_value);
++
++	indio_dev->dev.parent = &pdev->dev;
++	indio_dev->name = dev_name(&pdev->dev);
++	indio_dev->modes = INDIO_DIRECT_MODE;
++	indio_dev->info = &tiadc_info;
++
++	tiadc_step_config(ti_adc1);
++	tiadc_writel(ti_adc1, REG_FIFO1THR, 1 - 1);
++
++	/*
++	 * Set the control register for enable adc1, power down
++	 * and bypass preamplifier, and store step id in the FIFO
++	 */
++	val = tiadc_readl(ti_adc1, REG_CTRL);
++	val |= (CNTRLREG_ADC1ENB | CNTRLREG_STEPIDTAG |
++			CNTRLREG_PREAMP_PD | CNTRLREG_PREAMP_BYPASS);
++	tiadc_writel(ti_adc1, REG_CTRL, val);
++
++	val = tiadc_readl(ti_adc1, REG_IDLECONFIG);
++	tiadc_writel(ti_adc1, REG_IDLECONFIG, val | STEPCHARGE_RFP(0x3));
++
++	err = tiadc_channel_init(indio_dev, ti_adc1->channels);
++	if (err < 0)
++		return err;
++
++	err = iio_device_register(indio_dev);
++	if (err)
++		goto err_free_channels;
++
++	platform_set_drvdata(pdev, indio_dev);
++
++	/* Ivan 20160704: Config ADC registers*/
++	configADC_init();
++
++	return 0;
++
++ err_free_channels:
++	tiadc_channels_remove(indio_dev);
++ err_disable_clk:
++	pm_runtime_put_sync(&pdev->dev);
++	pm_runtime_disable(&pdev->dev);
++	return err;
++}
++
++static int tiadc_remove(struct platform_device *pdev)
++{
++	struct iio_dev *indio_dev = platform_get_drvdata(pdev);
++	struct ti_adc1_dev *adc_dev = iio_priv(indio_dev);
++	u32 step_en;
++
++	iio_device_unregister(indio_dev);
++	tiadc_channels_remove(indio_dev);
++
++	step_en = get_adc_step_mask(adc_dev);
++	am437x_adc_se_clr(adc_dev, step_en);
++
++	return 0;
++}
++
++#ifdef CONFIG_PM
++static int tiadc_suspend(struct device *dev)
++{
++	struct iio_dev *indio_dev = dev_get_drvdata(dev);
++	struct ti_adc1_dev *adc_dev = iio_priv(indio_dev);
++	unsigned int idle;
++
++	if (!device_may_wakeup(adc_dev->dev)) {
++		idle = tiadc_readl(adc_dev, REG_CTRL);
++		idle &= ~(CNTRLREG_TSCSSENB);
++		tiadc_writel(adc_dev, REG_CTRL, (idle |
++				CNTRLREG_POWERDOWN));
++	}
++
++	return 0;
++}
++
++static int tiadc_resume(struct device *dev)
++{
++	struct iio_dev *indio_dev = dev_get_drvdata(dev);
++	struct ti_adc1_dev *adc_dev = iio_priv(indio_dev);
++	unsigned int restore;
++
++	/* Make sure ADC is powered up */
++	restore = tiadc_readl(adc_dev, REG_CTRL);
++	restore &= ~(CNTRLREG_POWERDOWN);
++	tiadc_writel(adc_dev, REG_CTRL, restore);
++
++	tiadc_step_config(adc_dev);
++
++	return 0;
++}
++
++static const struct dev_pm_ops tiadc_pm_ops = {
++	.suspend = tiadc_suspend,
++	.resume = tiadc_resume,
++};
++#define TIADC_PM_OPS (&tiadc_pm_ops)
++#else
++#define TIADC_PM_OPS NULL
++#endif
++
++static const struct of_device_id ti_adc_dt_ids[] = {
++	{ .compatible = "ti,am437x-adc1", },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, ti_adc_dt_ids);
++
++static struct platform_driver tiadc_driver = {
++	.driver = {
++		.name   = "TI-am437x-adc",
++		.owner	= THIS_MODULE,
++		.pm	= TIADC_PM_OPS,
++		.of_match_table = of_match_ptr(ti_adc_dt_ids),
++	},
++	.probe	= tiadc_probe,
++	.remove	= tiadc_remove,
++};
++module_platform_driver(tiadc_driver);
++
++MODULE_DESCRIPTION("TI ADC controller driver");
++MODULE_AUTHOR("MYiR <support@myirtech.com>");
++MODULE_LICENSE("GPL");
+diff --git a/drivers/remoteproc/pru_rproc.c b/drivers/remoteproc/pru_rproc.c
+index f12f1a9..cf2c497 100644
+--- a/drivers/remoteproc/pru_rproc.c
++++ b/drivers/remoteproc/pru_rproc.c
+@@ -785,13 +785,13 @@ static struct pru_private_data am335x_pru1_rproc_pdata = {
+ /* AM437x PRUSS1 PRU core-specific private data */
+ static struct pru_private_data am437x_pru1_0_rproc_pdata = {
+ 	.id = 0,
+-	.fw_name = "am437x-pru1_0-fw",
++	.fw_name = "am437x-pru1_0-fw",   //FXN_LAWRENCE_20160519_FXNXXXXXX002   , should match the PRU FW file name in FS /lib/firmware
+ 	.eth_fw_name = "ti-pruss/am437x-pru0-prueth-fw.elf"
+ };
+ 
+ static struct pru_private_data am437x_pru1_1_rproc_pdata = {
+ 	.id = 1,
+-	.fw_name = "am437x-pru1_1-fw",
++	.fw_name = "am437x-pru1_1-fw",   //FXN_LAWRENCE_20160519_FXNXXXXXX002   , should match the PRU FW file name in FS /lib/firmware
+ 	.eth_fw_name = "ti-pruss/am437x-pru1-prueth-fw.elf"
+ };
+ 
+diff --git a/include/linux/mfd/ti_am437x_adc1.h b/include/linux/mfd/ti_am437x_adc1.h
+new file mode 100644
+index 0000000..6d6c822
+--- /dev/null
++++ b/include/linux/mfd/ti_am437x_adc1.h
+@@ -0,0 +1,179 @@
++#ifndef __LINUX_TI_AM437X_ADC1_MFD_H
++#define __LINUX_TI_AM437X_ADC1_MFD_H
++
++/*
++ * TI ADC1 MFD driver
++ *
++ * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation version 2.
++ *
++ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
++ * kind, whether express or implied; without even the implied warranty
++ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/mfd/core.h>
++
++#define REG_RAWIRQSTATUS	0x024
++#define REG_IRQSTATUS		0x028
++#define REG_IRQENABLE		0x02C
++#define REG_IRQCLR		0x030
++#define REG_IRQWAKEUP		0x034
++#define REG_CTRL		0x040
++#define REG_ADCFSM		0x044
++#define REG_CLKDIV		0x04C
++#define REG_SE			0x054
++#define REG_IDLECONFIG		0x058
++#define REG_CHARGECONFIG	0x05C
++#define REG_CHARGEDELAY		0x060
++#define REG_STEPCONFIG(n)	(0x64 + ((n) * 8))
++#define REG_STEPDELAY(n)	(0x68 + ((n) * 8))
++#define REG_FIFO0CNT		0xE4
++#define REG_FIFO0THR		0xE8
++#define REG_FIFO1CNT		0xF0
++#define REG_FIFO1THR		0xF4
++#define REG_FIFO0		0x100
++#define REG_FIFO1		0x200
++
++/*	Register Bitfields	*/
++/* IRQ wakeup enable */
++#define IRQWKUP_ENB		BIT(0)
++
++/* Step Enable */
++#define STEPENB_MASK		(0x1FFFF << 0)
++#define STEPENB(val)		((val) << 0)
++
++/* IRQ enable */
++#define IRQENB_HW_PEN		BIT(0)
++#define IRQENB_FIFO0THRES	BIT(2)
++#define IRQENB_FIFO1THRES	BIT(5)
++#define IRQENB_PENUP		BIT(9)
++
++/* Step Configuration */
++#define STEPCONFIG_MODE_MASK	(3 << 0)
++#define STEPCONFIG_MODE(val)	((val) << 0)
++#define STEPCONFIG_MODE_HWSYNC	STEPCONFIG_MODE(2)
++#define STEPCONFIG_AVG_MASK	(7 << 2)
++#define STEPCONFIG_AVG(val)	((val) << 2)
++#define STEPCONFIG_AVG_16	STEPCONFIG_AVG(4)
++#define STEPCONFIG_XPP		BIT(5)
++#define STEPCONFIG_XNN		BIT(6)
++#define STEPCONFIG_YPP		BIT(7)
++#define STEPCONFIG_YNN		BIT(8)
++#define STEPCONFIG_XNP		BIT(9)
++#define STEPCONFIG_YPN		BIT(10)
++#define STEPCONFIG_INM_MASK	(0xF << 15)
++#define STEPCONFIG_INM(val)	((val) << 15)
++#define STEPCONFIG_INM_ADCREFM	STEPCONFIG_INM(8)
++#define STEPCONFIG_INP_MASK	(0xF << 19)
++#define STEPCONFIG_INP(val)	((val) << 19)
++#define STEPCONFIG_INP_AN4	STEPCONFIG_INP(4)
++#define STEPCONFIG_INP_ADCREFM	STEPCONFIG_INP(8)
++#define STEPCONFIG_FIFO1	BIT(26)
++#define STEPCONFIG_DIFFCNTRL    BIT(25)
++
++/* Delay register */
++#define STEPDELAY_OPEN_MASK	(0x3FFFF << 0)
++#define STEPDELAY_OPEN(val)	((val) << 0)
++#define STEPCONFIG_OPENDLY	STEPDELAY_OPEN(0x098)
++#define STEPDELAY_SAMPLE_MASK	(0xFF << 24)
++#define STEPDELAY_SAMPLE(val)	((val) << 24)
++#define STEPCONFIG_SAMPLEDLY	STEPDELAY_SAMPLE(0)
++
++/* Charge Config */
++#define STEPCHARGE_RFP_MASK	(7 << 12)
++#define STEPCHARGE_RFP(val)	((val) << 12)
++#define STEPCHARGE_RFP_XPUL	STEPCHARGE_RFP(1)
++#define STEPCHARGE_INM_MASK	(0xF << 15)
++#define STEPCHARGE_INM(val)	((val) << 15)
++#define STEPCHARGE_INM_AN1	STEPCHARGE_INM(1)
++#define STEPCHARGE_INP_MASK	(0xF << 19)
++#define STEPCHARGE_INP(val)	((val) << 19)
++#define STEPCHARGE_RFM_MASK	(3 << 23)
++#define STEPCHARGE_RFM(val)	((val) << 23)
++#define STEPCHARGE_RFM_XNUR	STEPCHARGE_RFM(1)
++
++/* Charge delay */
++#define CHARGEDLY_OPEN_MASK	(0x3FFFF << 0)
++#define CHARGEDLY_OPEN(val)	((val) << 0)
++#define CHARGEDLY_OPENDLY	CHARGEDLY_OPEN(1)
++
++/* Control register */
++#define CNTRLREG_TSCSSENB	BIT(0)
++#define CNTRLREG_STEPID		BIT(1)
++#define CNTRLREG_STEPCONFIGWRT	BIT(2)
++#define CNTRLREG_POWERDOWN	BIT(4)
++#define CNTRLREG_AFE_CTRL_MASK	(3 << 5)
++#define CNTRLREG_AFE_CTRL(val)	((val) << 5)
++#define CNTRLREG_4WIRE		CNTRLREG_AFE_CTRL(1)
++#define CNTRLREG_5WIRE		CNTRLREG_AFE_CTRL(2)
++#define CNTRLREG_8WIRE		CNTRLREG_AFE_CTRL(3)
++#define CNTRLREG_ADC1ENB		BIT(0)
++#define CNTRLREG_STEPIDTAG      BIT(1)
++#define CNTRLREG_PREAMP_PD      BIT(5)
++#define CNTRLREG_PREAMP_BYPASS  BIT(6)
++
++/* FIFO READ Register */
++#define FIFOREAD_DATA_MASK (0xfff << 1)
++#define FIFOREAD_CHNLID_MASK (0xf << 16)
++
++/* Sequencer Status */
++#define SEQ_STATUS BIT(5)
++
++#define ADC_CLK			3000000
++#define TOTAL_STEPS		16
++#define TOTAL_CHANNELS		8
++
++/*
++* ADC runs at 3MHz, and it takes
++* 15 cycles to latch one data output.
++* Hence the idle time for ADC to
++* process one sample data would be
++* around 5 micro seconds.
++*/
++#define IDLE_TIMEOUT 5 /* microsec */
++
++#define TSCADC_CELLS		2
++
++struct ti_adc1_dev {
++	struct device *dev;
++	struct regmap *regmap_adc;
++	void __iomem *adc_base;
++	int irq;
++	int used_cells;	/* 1-2 */
++	int adc_cell;	/* -1 if not used */
++	struct mfd_cell cells[TSCADC_CELLS];
++	u32 reg_se_cache;
++	u32 pending_adc_val;
++	bool adc_pending;
++	spinlock_t reg_lock;
++
++	/* adc device */
++	struct adc_device *adc;
++
++	/* channels */
++	int channels;
++	u8 channel_line[8];
++	u8 channel_step[8];
++};
++
++/*
++static inline struct ti_adc1_dev *ti_adc1_dev_get(struct platform_device *p)
++{
++	struct ti_adc1_dev **adc_dev = p->dev.platform_data;
++
++	return *adc_dev;
++}
++*/
++/*
++void am335x_tsc_se_update(struct ti_tscadc_dev *tsadc, u32 val);
++void am335x_tsc_se_set_cont(struct ti_tscadc_dev *tsadc, u32 val);
++void am335x_tsc_se_adc_done(struct ti_tscadc_dev *tsadc);
++void am335x_tsc_se_set_once(struct ti_tscadc_dev *tsadc, u32 val);
++void am335x_tsc_se_clr(struct ti_tscadc_dev *tsadc, u32 val);
++*/
++#endif

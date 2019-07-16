@@ -1,0 +1,182 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<edmx:Edmx xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx" Version="4.0">
+
+  <edmx:Reference Uri="http://docs.oasis-open.org/odata/odata/v4.0/cs01/vocabularies/Org.OData.Core.V1.xml">
+    <edmx:Include Namespace="Org.OData.Core.V1" Alias="OData"/>
+  </edmx:Reference>
+  <edmx:Reference Uri="schemas/xml/v1/RedfishExtensions_v1.xml">
+    <edmx:Include Namespace="RedfishExtensions.v1_0_0" Alias="Redfish"/>
+  </edmx:Reference>
+  <edmx:Reference Uri="schemas/xml/v1/Resource_v1.xml">
+    <edmx:Include Namespace="Resource"/>
+    <edmx:Include Namespace="Resource.v1_0_0" />
+    <edmx:Include Namespace="Resource.v1_1_0" />
+  </edmx:Reference>
+  <edmx:Reference Uri="schemas/xml/v1/Chassis_v1.xml">
+    <edmx:Include Namespace="Chassis.v1_0_0" />
+  </edmx:Reference>
+
+  <edmx:DataServices>
+  
+    <Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="OcsMgmtSwitch">
+      
+      <ComplexType Name="MgmtSwitch" Abstract="true">
+        <Annotation Term="OData.Description" String="This defines OCS extensions to the Redfish Chassis object for the management switch."/>
+        <Annotation Term="OData.LongDescription" String="This defines OCS extensions to the Redfish Chassis object for the management switch."/>
+        <Annotation Term="OData.AdditionalProperties" Bool="false"/>
+      </ComplexType>
+      
+      <EntityType Name="Port" BaseType="Resource.v1_0_0.Resource" Abstract="true">
+        <Annotation Term="OData.Description" String="This is a single port on the management switch."/>
+        <Annotation Term="OData.LongDescription" String="This is a single port on the management switch."/>
+      </EntityType>
+      
+      <Action Name="Configure" IsBound="true">
+        <Parameter Name="MgmtSwitch" Type="Chassis.v1_0_0.OemActions"/>
+        <Parameter Name="File" Type="Edm.String">
+          <Annotation Term="OData.Description" String="The path to the configuration file that should be used for the update."/>
+          <Annotation Term="OData.LongDescription" String="The path to the configuration file that should be used for the update."/>
+        </Parameter>
+        <Annotation Term="OData.Description" String="This action will apply a new configuration to the management switch."/>
+        <Annotation Term="OData.LongDescription" String="This action will apply a new configuration to the management switch."/>
+      </Action>
+      
+      <Action Name="FirmwareUpdate" IsBound="true">
+        <Parameter Name="MgmtSwitch" Type="Chassis.v1_0_0.OemActions"/>
+        <Parameter Name="File" Type="Edm.String">
+          <Annotation Term="OData.Description" String="The path to the firmware file that should be used for the update."/>
+          <Annotation Term="OData.LongDescription" String="The path to the firmware file that should be used for the update."/>
+        </Parameter>
+        <Annotation Term="OData.Description" String="This action will start the firmware update process for the management switch."/>
+        <Annotation Term="OData.LongDescription" String="This action will start the firmware update process for the management switch."/>
+      </Action>
+    
+    </Schema>
+    
+    <Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="OcsMgmtSwitch.v1_0_0">
+      
+      <ComplexType Name="MgmtSwitch" BaseType="OcsMgmtSwitch.MgmtSwitch">
+        <Property Name="MACAddress" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The base MAC address for the switch."/>
+          <Annotation Term="OData.LongDescription" String="The base MAC address for the switch."/>
+        </Property>
+        <Property Name="HardwareVersion" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The hardware version of this switch."/>
+          <Annotation Term="OData.LongDescription" String="The hardware version of this switch."/>
+        </Property>
+        <Property Name="FirmwareVersion" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The version of firmware running on the switch."/>
+          <Annotation Term="OData.LongDescription" String="The version of firmware running on the switch."/>
+        </Property>
+        <Property Name="FirmwareDate" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The release date of the current firmware."/>
+          <Annotation Term="OData.LongDescription" String="The release date of the current firmware."/>
+        </Property>
+        <Property Name="UpTime" Type="Edm.Decimal">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The number of seconds the switch has been running without reboot."/>
+          <Annotation Term="OData.LongDescription" String="The number of seconds the switch has been running without reboot."/>
+        </Property>
+        <NavigationProperty Name="Ports" Type="Collection(OcsMgmtSwitch.Port)" Nullable="false">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="An array of references to the ports of the switch."/>
+          <Annotation Term="OData.LongDescription" String="An array of references to the ports of the switch."/>
+        </NavigationProperty>
+      </ComplexType>
+      
+      <EntityType Name="Port" BaseType="OcsMgmtSwitch.Port">
+        <Property Name="MACAddress" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The base MAC address for the switch."/>
+          <Annotation Term="OData.LongDescription" String="The base MAC address for the switch."/>
+        </Property>
+        <Property Name="LinkState" Type="OcsMgmtSwitch_v1.0.0.LinkState">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The base MAC address for the switch."/>
+          <Annotation Term="OData.LongDescription" String="The base MAC address for the switch."/>
+        </Property>
+        <Property Name="AdminState" Type="OcsMgmtSwitch_v1.0.0.AdminState">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The base MAC address for the switch."/>
+          <Annotation Term="OData.LongDescription" String="The base MAC address for the switch."/>
+        </Property>
+        <Property Name="DHCPAddress" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The base MAC address for the switch."/>
+          <Annotation Term="OData.LongDescription" String="The base MAC address for the switch."/>
+        </Property>
+        <Property Name="DHCPLeaseState" Type="OcsMgmtSwitch_v1.0.0.DHCPLeaseState">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The base MAC address for the switch."/>
+          <Annotation Term="OData.LongDescription" String="The base MAC address for the switch."/>
+        </Property>
+      </EntityType>
+      
+      <EnumType Name="LinkState">
+         <Member Name="Up">
+          <Annotation Term="OData.Description" String="The link is up."/>
+        </Member>
+        <Member Name="Down">
+          <Annotation Term="OData.Description" String="The link is down."/>
+        </Member>
+        <Member Name="Testing">
+          <Annotation Term="OData.Description" String="The link is in testing."/>
+        </Member>
+        <Member Name="Unknown">
+          <Annotation Term="OData.Description" String="The link state is unknown."/>
+        </Member>
+        <Member Name="Dormant">
+          <Annotation Term="OData.Description" String="The link is dormant."/>
+        </Member>
+        <Member Name="LowerLayerDown">
+          <Annotation Term="OData.Description" String="The link lower layer is down.."/>
+        </Member>
+        <Member Name="Suspended">
+          <Annotation Term="OData.Description" String="The link is suspended."/>
+        </Member>
+      </EnumType>
+      
+      <EnumType Name="AdminState">
+         <Member Name="Up">
+          <Annotation Term="OData.Description" String="The link admin state is up."/>
+        </Member>
+        <Member Name="Down">
+          <Annotation Term="OData.Description" String="The link admin state is down."/>
+        </Member>
+        <Member Name="Testing">
+          <Annotation Term="OData.Description" String="The link admin state is testing."/>
+        </Member>
+      </EnumType>
+      
+      <EnumType Name="DHCPLeaseState">
+         <Member Name="PreAllocated">
+          <Annotation Term="OData.Description" String="The DHCP address is pre-allocated."/>
+        </Member>
+        <Member Name="Valid">
+          <Annotation Term="OData.Description" String="The DHCP lease is valid."/>
+        </Member>
+        <Member Name="Expired">
+          <Annotation Term="OData.Description" String="The DHCP lease has expired."/>
+        </Member>
+        <Member Name="Declined">
+          <Annotation Term="OData.Description" String="The DHCP lease was declined."/>
+        </Member>
+      </EnumType>
+      
+      <ComplexType Name="Actions">
+        <Annotation Term="OData.AdditionalProperties" Bool="false"/>
+        <Property Name="Oem" Type="OcsMgmtSwitch.v1_0_0.OemActions" Nullable="false"/>
+      </ComplexType>
+
+      <ComplexType Name="OemActions">
+        <Annotation Term="OData.AdditionalProperties" Bool="true"/>
+      </ComplexType>
+      
+    </Schema>
+
+  </edmx:DataServices>
+</edmx:Edmx>

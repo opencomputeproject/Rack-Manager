@@ -1,0 +1,25 @@
+by default rack manager power will be be port 25
+
+config
+interface GigabitEthernet25
+no switchport access vlan
+no service-acl input
+switchport access vlan 1
+
+exit
+exit
+
+In future we might make this programable, through swtich console serial port we can automatically execute:
+
+show mac address-table address f4:ce:46:32:75:53 
+
+Whereby f4:ce:46:32:75:53 is the MAC address of NIC2 on the Rack Manager.  Identify the port the rack manager is connected, and update it to VLAN1
+
+Rack Manager IP Address:
+
+	172.17.0.202
+	255.255.255.252
+	
+vi /etc/network/interfaces
+
+up route add -net 172.17.0.0 netmask 255.255.255.0 gw 172.17.0.201

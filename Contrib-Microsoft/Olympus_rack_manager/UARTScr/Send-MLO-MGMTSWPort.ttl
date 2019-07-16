@@ -1,0 +1,25 @@
+;;============================================================================
+;;  Filename   : Send-MLO.ttl
+;;  Description: Tera Term Macro to send MLO to OCS M2010 board
+;;============================================================================
+;; Update these settings as needed before loading the script
+;;============================================================================
+TIMEOUT = 30
+
+;;============================================================================
+;;  DEFINITIONS
+;;============================================================================
+PromptROMBL = 'C'
+
+getdir pwd
+dirname upwd pwd
+makepath UBootImage pwd 'u-boot.img'
+makepath UBootSPLImage pwd 'u-boot-spl.bin'
+
+;;connect '/C:4'
+
+;;============================================================================
+;; Start SPL
+;;============================================================================
+wait PromptROMBL
+xmodemsend UBootSPLImage 2

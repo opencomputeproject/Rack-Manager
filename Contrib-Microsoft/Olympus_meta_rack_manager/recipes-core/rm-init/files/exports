@@ -1,0 +1,1 @@
+/usr/srvroot/shared *(rw,nohide,insecure,root_squash,sync,no_subtree_check)

@@ -1,0 +1,307 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<edmx:Edmx xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx" Version="4.0">
+
+  <edmx:Reference Uri="http://docs.oasis-open.org/odata/odata/v4.0/cs01/vocabularies/Org.OData.Core.V1.xml">
+    <edmx:Include Namespace="Org.OData.Core.V1" Alias="OData"/>
+  </edmx:Reference>
+  <edmx:Reference Uri="schemas/xml/v1/RedfishExtensions_v1.xml">
+    <edmx:Include Namespace="RedfishExtensions.v1_0_0" Alias="Redfish"/>
+  </edmx:Reference>
+  <edmx:Reference Uri="schemas/xml/v1/Resource_v1.xml">
+    <edmx:Include Namespace="Resource"/>
+    <edmx:Include Namespace="Resource.v1_0_0" />
+    <edmx:Include Namespace="Resource.v1_1_0" />
+  </edmx:Reference>
+  <edmx:Reference Uri="schemas/xml/v1/Manager_v1.xml">
+    <edmx:Include Namespace="Manager.v1_0_0" />
+  </edmx:Reference>
+
+  <edmx:DataServices>
+  
+    <Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="OcsRackManager">
+      
+      <ComplexType Name="RackManager" Abstract="true">
+        <Annotation Term="OData.Description" String="This defines OCS extensions to the Redfish Manager object for the Rack Manager."/>
+        <Annotation Term="OData.LongDescription" String="This defines OCS extensions to the Redfish Manager object for the Rack Manager."/>
+        <Annotation Term="OData.AdditionalProperties" Bool="false"/>
+      </ComplexType>
+      
+      <ComplexType Name="LogEntry" Abstract="true">
+        <Annotation Term="OData.Description" String="This defines OCS extensions to the Redfish LogEntry object."/>
+        <Annotation Term="OData.LongDescription" String="This defines OCS extensions to the Redfish LogEntry object."/>
+        <Annotation Term="OData.AdditionalProperties" Bool="false"/>
+      </ComplexType>
+      
+      <ComplexType Name="EthernetInterface" Abstract="true">
+        <Annotation Term="OData.Description" String="This defines OCS extensions to the Redfish EthernetInterface object."/>
+        <Annotation Term="OData.LongDescription" String="This defines OCS extensions to the Redfish EthernetInterface object."/>
+        <Annotation Term="OData.AdditionalProperties" Bool="false"/>
+      </ComplexType>
+      
+      <EntityType Name="Tftp" BaseType="Resource.v1_0_0.Resource" Abstract="true">
+        <Annotation Term="OData.Description" String="This is the TFTP service in the system."/>
+        <Annotation Term="OData.LongDescription" String="This is the TFTP service in the system."/>
+      </EntityType>
+      
+      <Action Name="FirmwareUpdate" IsBound="true">
+        <Parameter Name="RackManager" Type="Manager.v1_0_0.OemActions"/>
+        <Parameter Name="File" Type="Edm.String">
+          <Annotation Term="OData.Description" String="The path to the firmware file that should be used for the update."/>
+          <Annotation Term="OData.LongDescription" String="The path to the firmware file that should be used for the update."/>
+        </Parameter>
+        <Annotation Term="OData.Description" String="This action will start the firmware update process for the rack manager."/>
+        <Annotation Term="OData.LongDescription" String="This action will start the firmware update process for the rack manager."/>
+      </Action>
+      
+      <Action Name="Delete" IsBound="true">
+        <Parameter Name="Tftp" Type="OcsRackManager.v1_0_0.Actions"/>
+        <Parameter Name="File" Type="Edm.String">
+          <Annotation Term="OData.Description" String="The path to the file that should be deleted."/>
+          <Annotation Term="OData.LongDescription" String="The path to the file that should be deleted."/>
+        </Parameter>
+        <Annotation Term="OData.Description" String="This action will delete a file from the TFTP server on the rack manager."/>
+        <Annotation Term="OData.LongDescription" String="This action will delete a file from the TFTP server on the rack manager."/>
+      </Action>
+      
+      <Action Name="Get" IsBound="true">
+        <Parameter Name="Tftp" Type="OcsRackManager.v1_0_0.Actions"/>
+        <Parameter Name="Server" Type="Edm.String">
+          <Annotation Term="OData.Description" String="The IP address of the server that has the requested file."/>
+          <Annotation Term="OData.LongDescription" String="The IP address of the server that has the requested file."/>
+        </Parameter>
+        <Parameter Name="File" Type="Edm.String">
+          <Annotation Term="OData.Description" String="The path of the requested file on the server."/>
+          <Annotation Term="OData.LongDescription" String="The path of the requested file on the server."/>
+        </Parameter>
+        <Annotation Term="OData.Description" String="This action will transfer a file from a TFTP server to the rack manager."/>
+        <Annotation Term="OData.LongDescription" String="This action will transfer a file from a TFTP server to the rack manager."/>
+      </Action>
+      
+      <Action Name="Put" IsBound="true">
+        <Parameter Name="Tftp" Type="OcsRackManager.v1_0_0.Actions"/>
+        <Parameter Name="Server" Type="Edm.String">
+          <Annotation Term="OData.Description" String="The IP address of the server that will receive the requested file."/>
+          <Annotation Term="OData.LongDescription" String="The IP address of the server that will receive the requested file."/>
+        </Parameter>
+        <Parameter Name="File" Type="Edm.String">
+          <Annotation Term="OData.Description" String="The path on the server to put the requested file."/>
+          <Annotation Term="OData.LongDescription" String="The path on the server to put the requested file."/>
+        </Parameter>
+        <Paremeter Name="Target" Type="OcsRackManager.Target">
+          <Annotation Term="OData.Description" String="The target file to get from the rack manager."/>
+          <Annotation Term="OData.LongDescription" String="The target file to get from the rack manager."/>
+        </Paremeter>
+        <Annotation Term="OData.Description" String="This action will start the firmware update process for the rack manager."/>
+        <Annotation Term="OData.LongDescription" String="This action will start the firmware update process for the rack manager."/>
+      </Action>
+      
+      <EnumType Name="Target">
+        <Member Name="AuditLog">
+          <Annotation Term="OData.Description" String="The rack manager audit log."/>
+        </Member>
+        <Member Name="DebugLog">
+          <Annotation Term="OData.Description" String="The rack manager debug log."/>
+        </Member>
+        <Member Name="TelemetryLog">
+          <Annotation Term="OData.Description" String="The rack manager telemetry log."/>
+        </Member>
+        <Member Name="RestLog">
+          <Annotation Term="OData.Description" String="The rack manager REST log."/>
+        </Member>
+        <Member Name="FirmwareUpdateLog">
+          <Annotation Term="OData.Description" String="The rack manager update log."/>
+        </Member>
+        <Member Name="SystemLog">
+          <Annotation Term="OData.Description" String="The rack manager system log."/>
+        </Member>
+        <Member Name="KernelLog">
+          <Annotation Term="OData.Description" String="The rack manager kernel message buffer."/>
+        </Member>
+      </EnumType>
+    
+    </Schema>
+    
+    <Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="OcsRackManager.v1_0_0">
+      
+      <ComplexType Name="RackManager" BaseTye="OcsRackManager.RackManager">
+        <Property Name="HostName" Type="Edm.String">
+          <Annotation Term="OData.Description" String="The host name assigned to the rack manager."/>
+          <Annotation Term="OData.LongDescription" String="The host name assigned to the rack manager."/>
+        </Property>
+        <Property Name="TimeSinceLastBoot" Type="Edm.String">
+          <Annotation Term="OData.Description" String="The amount of time since the last reboot of the rack manager."/>
+          <Annotation Term="OData.LongDescription" String="The amount of time since the last reboot of the rack manager."/>
+        </Property>
+        <Property Name="Components" Type="Collection(OcsRackManager.v1_0_0.Component)">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The list of software components running in the rack manager."/>
+          <Annotation Term="OData.LongDescription" String="The list of software components running in the rack manager."/>
+        </Property>
+        <Property Name="TFTP" Type="OcsRackManager.v1_0_0.Service">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The TFTP service running on the rack manager."/>
+          <Annotation Term="OData.LongDescription" String="The TFTP service running on the rack manager."/>
+        </Property>
+        <Property Name="NFS" Type="OcsRackManager.v1_0_0.Service">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The NFS service running on the rack manager."/>
+          <Annotation Term="OData.LongDescription" String="The NFS service running on the rack manager."/>
+        </Property>
+        <Property Name="NTP" Type="OcsRackManager.v1_0_0.Service">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The NTP service running on the rack manager."/>
+          <Annotation Term="OData.LongDescription" String="The NTP service running on the rack manager."/>
+        </Property>
+        <Property Name="RemoteITP" Type="OcsRackManager.v1_0_0.Service">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The remote ITP debugging service running on the rack manager."/>
+          <Annotation Term="OData.LongDescription" String="The remote ITP debugging service running on the rack manager."/>
+        </Property>
+        <Property Name="ThrottleControl" Type="OcsRackManager.v1_0_0.ThrottleControl">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The GPIO control for throttle signals."/>
+          <Annotation Term="OData.LongDescription" String="The GPIO control for throttle signals."/>
+        </Property>
+      </ComplexType>
+      
+      <ComplexType name="Component">
+        <Annotation Term="OData.AdditionalProperties" Bool="false"/>
+        <Property Name="Name" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The name of the software component."/>
+          <Annotation Term="OData.LongDescription" String="The name of the software component."/>
+        </Property>
+        <Property Name="Version" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The version of the software component."/>
+          <Annotation Term="OData.LongDescription" String="The version of the software component."/>
+        </Property>
+      </ComplexType>
+      
+      <ComplexType name="Service">
+        <Annotation Term="OData.AdditionalProperties" Bool="false"/>
+        <Property Name="ServiceStatus" Type="OcsRackManager.v1_0_0.ServiceStatus">
+          <Annotation Term="OData.Description" String="The name of the software component."/>
+          <Annotation Term="OData.LongDescription" String="The name of the software component."/>
+        </Property>
+        <Property Name="ServiceEnabled" Type="Edm.Boolean">
+          <Annotation Term="OData.Description" String="The version of the software component."/>
+          <Annotation Term="OData.LongDescription" String="The version of the software component."/>
+        </Property>
+        <Property Name="TimeServer" Type="Edm.String">
+          <Annotation Term="OData.Description" String="The version of the software component."/>
+          <Annotation Term="OData.LongDescription" String="The version of the software component."/>
+        </Property>
+        <NavigationProperty Name="Files" Type="OcsRackManager.Tftp" Nullable="false">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="A reference to the system FPGA information."/>
+          <Annotation Term="OData.LongDescription" String="The value of this property shall be a link to a resource of type FPGA."/>
+        </NavigationProperty>
+      </ComplexType>
+      
+      <EnumType Name="ServiceStatus">
+        <Member Name="Start">
+          <Annotation Term="OData.Description" String="Start the service, or the service is running."/>
+        </Member>
+        <Member Name="Stop">
+          <Annotation Term="OData.Description" String="Stop the service, or the service is not running."/>
+        </Member>
+        <Member Name="Restart">
+          <Annotation Term="OData.Description" String="Restart the service."/>
+        </Member>
+      </EnumType>
+      
+      <ComplexType name="ThrottleControl">
+        <Annotation Term="OData.AdditionalProperties" Bool="false"/>
+        <Property Name="LocalBypass" Type="Edm.Boolean">
+          <Annotation Term="OData.Description" String="Local bypass control for the throttle singal."/>
+          <Annotation Term="OData.LongDescription" String="Local bypass control for the throttle singal."/>
+        </Property>
+        <Property Name="LocalEnable" Type="Edm.Boolean">
+          <Annotation Term="OData.Description" String="Local enable control for the throttle signal."/>
+          <Annotation Term="OData.LongDescription" String="Local enable control for the throttle signal."/>
+        </Property>
+        <Property Name="RowBypass" Type="Edm.Boolean">
+          <Annotation Term="OData.Description" String="Row bypass control for the throttle signal."/>
+          <Annotation Term="OData.LongDescription" String="Row bypass control for the throttle signal."/>
+        </Property>
+        <Property Name="RowEnable" Type="Edm.Boolean">
+          <Annotation Term="OData.Description" String="Row enable control for the throttle signal."/>
+          <Annotation Term="OData.LongDescription" String="Row enable control for the throttle signal."/>
+        </Property>
+      </ComplexType>
+      
+      <ComplexType Name="LogEntry" BaseType="OcsRackManager.LogEntry">
+        <Property Name="Component" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The component reporting the log entry."/>
+          <Annotation Term="OData.LongDescription" String="The component reporting the log entry."/>
+        </Property>
+        <Property Name="PortId" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The port ID of the component."/>
+          <Annotation Term="OData.LongDescription" String="The port ID of the component."/>
+        </Property>
+        <Property Name="DeviceId" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The device ID of the component."/>
+          <Annotation Term="OData.LongDescription" String="The device ID of the component."/>
+        </Property>
+        <Property Name="FanId" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The fan ID of the component."/>
+          <Annotation Term="OData.LongDescription" String="The fan ID of the component."/>
+        </Property>
+        <Property Name="SensorType" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The type of sensor used to generate the entry information."/>
+          <Annotation Term="OData.LongDescription" String="The type of sensor used to generate the entry information."/>
+        </Property>
+      </ComplexType>
+      
+      <ComplexType Name="EthernetInterface" BaseType="OcsRackManager.EthernetInterface">
+        <Property Name="MgmtGateway" Type="Edm.String">
+          <Annotation Term="OData.Description" String="The IP address of the gateway for the management network."/>
+          <Annotation Term="OData.LongDescription" String="The IP address of the gateway for the management network."/>
+        </Property>
+        <Property Name="MgmtNetmask" Type="Edm.String">
+          <Annotation Term="OData.Description" String="The subnet mask of the management network."/>
+          <Annotation Term="OData.LongDescription" String="The subnet mask of the management network."/>
+        </Property>
+      </ComplexType>
+      
+      <EntityType Name="Tftp" BaseType="OcsRackManager.Tftp">
+        <Property Name="Files" Type="Collection(OcsRackManager.v1_0_0.TftpFile)">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The list of files available from the TFTP service."/>
+          <Annotation Term="OData.LongDescription" String="The list of files available from the TFTP service."/>
+        </Property>
+        <Property Name="Actions" Type="OcsRackManager.v1_0_0.Actions" Nullable="false">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The available actions for this resource."/>
+          <Annotation Term="OData.LongDescription" String="The Actions property shall contain the available actions for this resource."/>
+        </Property>
+      </EntityType>
+      
+      <ComplexType Name="TftpFile">
+        <Annotation Term="OData.AdditionalProperties" Bool="false"/>
+        <Property Name="Name" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The name of the file."/>
+          <Annotation Term="OData.LongDescription" String="The name of the file."/>
+        </Property>
+      </ComplexType>
+      
+      <ComplexType Name="Actions">
+        <Annotation Term="OData.AdditionalProperties" Bool="false"/>
+        <Property Name="Oem" Type="OcsRackManager.v1_0_0.OemActions" Nullable="false"/>
+      </ComplexType>
+
+      <ComplexType Name="OemActions">
+        <Annotation Term="OData.AdditionalProperties" Bool="true"/>
+      </ComplexType>
+      
+    </Schema>
+
+  </edmx:DataServices>
+</edmx:Edmx>

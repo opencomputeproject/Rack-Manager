@@ -1,0 +1,77 @@
+;;============================================================================
+;;  Filename   : Send-MLO-UB.ttl
+;;  Description: Tera Term Macro to load firmware into OCS M2010 board
+;;============================================================================
+;; Update these settings as needed before loading the script
+;;============================================================================
+TFTP_SERVER_IP = '192.168.1.1'
+TIMEOUT = 30
+
+;;============================================================================
+;;  DEFINITIONS
+;;============================================================================
+PromptROMBL = 'C'
+PromptSPL   = 'C'
+MsgAutoboot = 'Hit any key to stop autoboot:'
+MsgUBoot	= 'U-Boot#'
+MsgDHCPBind = 'bound to address'
+
+getdir pwd
+dirname upwd pwd
+makepath UBootImage pwd 'u-boot.img'
+makepath UBootSPLImage pwd 'u-boot-spl.bin'
+makepath KernelImage upwd 'tftp\zImage-initflasher.bin'
+makepath DTBImage upwd 'tftp\am437x-msocs.dtb'
+
+;;connect '/C:4'
+
+;;============================================================================
+;; Start SPL and U-Boot load
+;;============================================================================
+wait PromptROMBL
+xmodemsend UBootSPLImage 2
+
+wait PromptSPL
+ymodemsend UBootImage
+
+wait MsgAutoboot
+mpause 500
+sendln ' '
+
+wait MsgUBoot
+mpause 500
+sendln ' setenv bootfile zImage-initflasher.bin'
+wait MsgUBoot
+mpause 500
+sendln ' setenv fdtfile am437x-msocs.dtb'
+
+;;============================================================================
+;; Get IP address and set TFTP server address
+;;============================================================================
+wait MsgUBoot
+mpause 500
+sendln ' setenv autoload no'
+wait MsgUBoot
+mpause 500
+sendln ' dhcp'
+wait MsgDHCPBind
+mpause 500
+sendln ' setenv serverip ' TFTP_SERVER_IP
+wait MsgUBoot
+sendln ' printenv serverip'
+
+;;============================================================================
+;; Start image load from TFTP
+;;============================================================================
+wait MsgUBoot
+mpause 500
+sendln ' setenv bootmedium NET'
+wait MsgUBoot
+mpause 500
+sendln ' run bootcmd'
+
+;;============================================================================
+;; Use this for loading images over UART instead of the above TFT load
+;;============================================================================
+;;kmtsend  KernelImage
+;;kmtsend  DTBImage

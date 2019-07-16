@@ -1,0 +1,2163 @@
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 3403bcf..c97f9a9 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -626,6 +626,17 @@ config AM43XX
+ 	  protocols, dual camera support, optional 3D graphics
+ 	  and an optional customer programmable secure boot.
+ 
++config AM43XX_OCS
++	bool "AM43XX SoC"
++	select CPU_V7
++	select SUPPORT_SPL
++	help
++	  Support for AM43xx SOC from Texas Instruments.
++	  The AM43xx high performance SOC features a Cortex-A9
++	  ARM core, a quad core PRU-ICSS for industrial Ethernet
++	  protocols, dual camera support, optional 3D graphics
++	  and an optional customer programmable secure boot.
++
+ config RMOBILE
+ 	bool "Renesas ARM SoCs"
+ 	select CPU_V7
+@@ -969,7 +980,7 @@ source "board/sunxi/Kconfig"
+ source "board/syteco/zmx25/Kconfig"
+ source "board/tbs/tbs2910/Kconfig"
+ source "board/ti/am335x/Kconfig"
+-source "board/ti/am43xx/Kconfig"
++source "board/ti/am43xx_ocs/Kconfig"
+ source "board/birdland/bav335x/Kconfig"
+ source "board/ti/ti814x/Kconfig"
+ source "board/ti/ti816x/Kconfig"
+diff --git a/arch/arm/cpu/armv7/am33xx/Kconfig b/arch/arm/cpu/armv7/am33xx/Kconfig
+index 68bcc64..2dd36e1 100644
+--- a/arch/arm/cpu/armv7/am33xx/Kconfig
++++ b/arch/arm/cpu/armv7/am33xx/Kconfig
+@@ -10,6 +10,12 @@ config TARGET_AM43XX_EVM
+ 	  to write software and develop hardware around
+ 	  an AM43xx processor subsystem.
+ 
++config TARGET_AM43XX_OCS
++	  bool "Support am43xx_ocs"
++	  select CREATE_BOARD_SYMLINK
++	  help
++		  This option specifies support for the AM43xx
++
+ config ISW_ENTRY_ADDR
+ 	hex "Address in memory or XIP flash of bootloader entry point"
+ 	help
+diff --git a/arch/arm/cpu/armv7/am33xx/board.c b/arch/arm/cpu/armv7/am33xx/board.c
+index 0437038..4a186b8 100644
+--- a/arch/arm/cpu/armv7/am33xx/board.c
++++ b/arch/arm/cpu/armv7/am33xx/board.c
+@@ -387,7 +387,7 @@ void s_init(void)
+ #endif
+ 	watchdog_disable();
+ 	set_uart_mux_conf();
+-	setup_clocks_for_console();
++	setup_clocks_for_console_uart1();
+ 	uart_soft_reset();
+ #if defined(CONFIG_SPL_AM33XX_ENABLE_RTC32K_OSC)
+ 	/* Enable RTC32K clock */
+diff --git a/arch/arm/cpu/armv7/am33xx/clock_am43xx.c b/arch/arm/cpu/armv7/am33xx/clock_am43xx.c
+index 9d69aa1..c15baba 100644
+--- a/arch/arm/cpu/armv7/am33xx/clock_am43xx.c
++++ b/arch/arm/cpu/armv7/am33xx/clock_am43xx.c
+@@ -73,6 +73,28 @@ void setup_clocks_for_console(void)
+ 			 MODULE_CLKCTRL_IDLEST_SHIFT;
+ 	}
+ }
++void setup_clocks_for_console_uart1(void)
++{
++	u32 clkctrl, idlest = MODULE_CLKCTRL_IDLEST_DISABLED;
++
++	/* Do not add any spl_debug prints in this function */
++	clrsetbits_le32(&cmper->l4lsclkstctrl, CD_CLKCTRL_CLKTRCTRL_MASK,
++			CD_CLKCTRL_CLKTRCTRL_SW_WKUP <<
++			CD_CLKCTRL_CLKTRCTRL_SHIFT);
++
++	/* Enable UART1 */
++	clrsetbits_le32(&cmper->uart1clkctrl,
++			MODULE_CLKCTRL_MODULEMODE_MASK,
++			MODULE_CLKCTRL_MODULEMODE_SW_EXPLICIT_EN <<
++			MODULE_CLKCTRL_MODULEMODE_SHIFT);
++
++	while ((idlest == MODULE_CLKCTRL_IDLEST_DISABLED) ||
++		(idlest == MODULE_CLKCTRL_IDLEST_TRANSITIONING)) {
++		clkctrl = readl(&cmper->uart1clkctrl);
++		idlest = (clkctrl & MODULE_CLKCTRL_IDLEST_MASK) >>
++			 MODULE_CLKCTRL_IDLEST_SHIFT;
++	}
++}
+ 
+ void enable_basic_clocks(void)
+ {
+diff --git a/arch/arm/cpu/armv7/am33xx/ddr.c b/arch/arm/cpu/armv7/am33xx/ddr.c
+old mode 100644
+new mode 100755
+index b3fb0c4..fa16bf6
+--- a/arch/arm/cpu/armv7/am33xx/ddr.c
++++ b/arch/arm/cpu/armv7/am33xx/ddr.c
+@@ -120,6 +120,13 @@ void config_sdram_emif4d5(const struct emif_regs *regs, int nr)
+ 
+ 	writel(regs->sdram_config, &emif_reg[nr]->emif_sdram_config);
+ 	writel(regs->sdram_config, &cstat->secure_emif_sdram_config);
++
++	/* Trigger initialization - TI commit 69b918b65d11d030ff39dcc9b5f4d4605cd23c7f */ 
++	writel(0x00003100, &emif_reg[nr]->emif_sdram_ref_ctrl); 
++	/* Wait 1ms because of L3 timeout error */ 
++	udelay(1000); 
++
++	/* Write proper sdram_ref_cref_ctrl value */ 
+ 	writel(regs->ref_ctrl, &emif_reg[nr]->emif_sdram_ref_ctrl);
+ 	writel(regs->ref_ctrl, &emif_reg[nr]->emif_sdram_ref_ctrl_shdw);
+ 
+@@ -234,8 +241,8 @@ static void ext_phy_settings_hwlvl(const struct emif_regs *regs, int nr)
+ 	 * Enable hardware leveling on the EMIF.  For details about these
+ 	 * magic values please see the EMIF registers section of the TRM.
+ 	 */
+-	writel(0x08020080, &emif_reg[nr]->emif_ddr_ext_phy_ctrl_1);
+-	writel(0x08020080, &emif_reg[nr]->emif_ddr_ext_phy_ctrl_1_shdw);
++	writel(0x10040100, &emif_reg[nr]->emif_ddr_ext_phy_ctrl_1);		// Value updated based on TI recommendation
++	writel(0x10040100, &emif_reg[nr]->emif_ddr_ext_phy_ctrl_1_shdw);// Value updated based on TI recommendation
+ 	writel(0x00000000, &emif_reg[nr]->emif_ddr_ext_phy_ctrl_22);
+ 	writel(0x00000000, &emif_reg[nr]->emif_ddr_ext_phy_ctrl_22_shdw);
+ 	writel(0x00600020, &emif_reg[nr]->emif_ddr_ext_phy_ctrl_23);
+@@ -291,8 +298,11 @@ void config_ddr_phy(const struct emif_regs *regs, int nr)
+ 	setbits_le32(&emif_reg[nr]->emif_sdram_ref_ctrl,
+ 		     EMIF_REG_INITREF_DIS_MASK);
+ #endif
++
++	/* Set time between rising edge of DDR_RESET to rising 
++	 * edge of DDR_CKE to > 500us per memory spec. TI commit 69b918b65d11d030ff39dcc9b5f4d4605cd23c7f */ 
+ 	if (regs->zq_config)
+-		writel(0x80003100, &emif_reg[nr]->emif_sdram_ref_ctrl);
++		writel(0x00003100, &emif_reg[nr]->emif_sdram_ref_ctrl); 
+ 
+ 	writel(regs->emif_ddr_phy_ctlr_1,
+ 		&emif_reg[nr]->emif_ddr_phy_ctrl_1);
+diff --git a/arch/arm/cpu/armv7/omap-common/boot-common.c b/arch/arm/cpu/armv7/omap-common/boot-common.c
+index bbc6bed..66bb54e 100644
+--- a/arch/arm/cpu/armv7/omap-common/boot-common.c
++++ b/arch/arm/cpu/armv7/omap-common/boot-common.c
+@@ -80,6 +80,8 @@ void save_omap_boot_params(void)
+ 	if (gd->arch.omap_boot_params.omap_bootdevice == 11)
+ 		gd->arch.omap_boot_params.omap_bootdevice = BOOT_DEVICE_SPI;
+ #endif
++
++	gd->arch.omap_boot_params.reset_reason = *((u8 *)(rom_params + RESET_REASON_OFFSET));
+ }
+ 
+ #ifdef CONFIG_SPL_BUILD
+diff --git a/arch/arm/include/asm/arch-am33xx/hardware.h b/arch/arm/include/asm/arch-am33xx/hardware.h
+index dd950e5..b00fd36 100644
+--- a/arch/arm/include/asm/arch-am33xx/hardware.h
++++ b/arch/arm/include/asm/arch-am33xx/hardware.h
+@@ -53,7 +53,7 @@
+ #define DDR_CONTROL_BASE_ADDR		0x44E11404
+ 
+ /* UART */
+-#define DEFAULT_UART_BASE		UART0_BASE
++#define DEFAULT_UART_BASE		UART1_BASE
+ 
+ /* GPMC Base address */
+ #define GPMC_BASE			0x50000000
+diff --git a/arch/arm/include/asm/arch-am33xx/hardware_am43xx.h b/arch/arm/include/asm/arch-am33xx/hardware_am43xx.h
+index a7da6b5..cb6cfe5 100644
+--- a/arch/arm/include/asm/arch-am33xx/hardware_am43xx.h
++++ b/arch/arm/include/asm/arch-am33xx/hardware_am43xx.h
+@@ -19,6 +19,9 @@
+ /* UART Base Address */
+ #define UART0_BASE			0x44E09000
+ 
++/* UART1 Base Address */
++#define UART1_BASE			0x48022000
++
+ /* GPIO Base address */
+ #define GPIO2_BASE			0x481AC000
+ 
+diff --git a/arch/arm/include/asm/arch-am33xx/sys_proto.h b/arch/arm/include/asm/arch-am33xx/sys_proto.h
+index dc2d32c..ccc9be4 100644
+--- a/arch/arm/include/asm/arch-am33xx/sys_proto.h
++++ b/arch/arm/include/asm/arch-am33xx/sys_proto.h
+@@ -21,6 +21,7 @@ extern struct ctrl_stat *cstat;
+ u32 get_device_type(void);
+ void save_omap_boot_params(void);
+ void setup_clocks_for_console(void);
++void setup_clocks_for_console_uart1(void);
+ void mpu_pll_config_val(int mpull_m);
+ void ddr_pll_config(unsigned int ddrpll_M);
+ 
+diff --git a/board/ti/am43xx_ocs/Kconfig b/board/ti/am43xx_ocs/Kconfig
+new file mode 100644
+index 0000000..334b8ac
+--- /dev/null
++++ b/board/ti/am43xx_ocs/Kconfig
+@@ -0,0 +1,22 @@
++if TARGET_AM43XX_OCS
++
++config SYS_BOARD
++	default "am43xx_ocs"
++
++config SYS_VENDOR
++	default "ti"
++
++config SYS_SOC
++	default "am33xx"
++
++config SYS_CONFIG_NAME
++	default "am43xx_ocs"
++
++config CONS_INDEX
++	int "UART used for console"
++	default 2
++	help
++	  The SoC has a total of 6 UARTs (UART0 to UART5 as referenced
++	  in documentation, etc) available to it. 
++
++endif
+diff --git a/board/ti/am43xx_ocs/Makefile b/board/ti/am43xx_ocs/Makefile
+new file mode 100644
+index 0000000..36ecb30
+--- /dev/null
++++ b/board/ti/am43xx_ocs/Makefile
+@@ -0,0 +1,13 @@
++#
++# Makefile
++#
++# Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
++#
++# SPDX-License-Identifier:	GPL-2.0+
++#
++
++ifeq ($(CONFIG_SKIP_LOWLEVEL_INIT),)
++obj-y	:= mux.o
++endif
++
++obj-y	+= board.o
+diff --git a/board/ti/am43xx_ocs/board.c b/board/ti/am43xx_ocs/board.c
+new file mode 100644
+index 0000000..e3c1942
+--- /dev/null
++++ b/board/ti/am43xx_ocs/board.c
+@@ -0,0 +1,989 @@
++/*
++ * board.c
++ *
++ * Board functions for TI AM43XX based boards
++ *
++ * Copyright (C) 2013, Texas Instruments, Incorporated - http://www.ti.com/
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#include <common.h>
++#include <i2c.h>
++#include <asm/errno.h>
++#include <spl.h>
++#include <usb.h>
++#include <asm/arch/clock.h>
++#include <asm/arch/sys_proto.h>
++#include <asm/arch/mux.h>
++#include <asm/arch/ddr_defs.h>
++#include <asm/arch/gpio.h>
++#include <asm/emif.h>
++#include <board-common/board_detect.h>
++#include "board.h"
++#include <power/pmic.h>
++#include <power/tps65218.h>
++#include <power/tps62362.h>
++#include <miiphy.h>
++#include <cpsw.h>
++#include <linux/usb/gadget.h>
++#include <dwc3-uboot.h>
++#include <dwc3-omap-uboot.h>
++#include <ti-usb-phy-uboot.h>
++#include <watchdog.h>
++
++DECLARE_GLOBAL_DATA_PTR;
++
++static struct ctrl_dev *cdev = (struct ctrl_dev *)CTRL_DEVICE_BASE;
++int ocs_eeprom_init(void);
++int ocs_i2c_eeprom_get_macid(uint8_t *mac0, uint8_t *mac1);
++
++/*
++ * Read header information from EEPROM into global structure.
++ */
++static int __maybe_unused read_eeprom(void)
++{
++	//return ti_i2c_eeprom_am_get(-1, CONFIG_SYS_I2C_EEPROM_ADDR);
++	return 1;
++}
++
++#ifndef CONFIG_SKIP_LOWLEVEL_INIT
++
++#define NUM_OPPS	6
++
++const struct dpll_params dpll_mpu[NUM_CRYSTAL_FREQ][NUM_OPPS] = {
++	{	/* 19.2 MHz */
++		{125, 3, 2, -1, -1, -1, -1},	/* OPP 50 */
++		{-1, -1, -1, -1, -1, -1, -1},	/* OPP RESERVED	*/
++		{125, 3, 1, -1, -1, -1, -1},	/* OPP 100 */
++		{150, 3, 1, -1, -1, -1, -1},	/* OPP 120 */
++		{125, 2, 1, -1, -1, -1, -1},	/* OPP TB */
++		{625, 11, 1, -1, -1, -1, -1}	/* OPP NT */
++	},
++	{	/* 24 MHz */
++		{300, 23, 1, -1, -1, -1, -1},	/* OPP 50 */
++		{-1, -1, -1, -1, -1, -1, -1},	/* OPP RESERVED	*/
++		{600, 23, 1, -1, -1, -1, -1},	/* OPP 100 */
++		{720, 23, 1, -1, -1, -1, -1},	/* OPP 120 */
++		{800, 23, 1, -1, -1, -1, -1},	/* OPP TB */
++		{1000, 23, 1, -1, -1, -1, -1}	/* OPP NT */
++	},
++	{	/* 25 MHz */
++		{300, 24, 1, -1, -1, -1, -1},	/* OPP 50 */
++		{-1, -1, -1, -1, -1, -1, -1},	/* OPP RESERVED	*/
++		{600, 24, 1, -1, -1, -1, -1},	/* OPP 100 */
++		{720, 24, 1, -1, -1, -1, -1},	/* OPP 120 */
++		{800, 24, 1, -1, -1, -1, -1},	/* OPP TB */
++		{1000, 24, 1, -1, -1, -1, -1}	/* OPP NT */
++	},
++	{	/* 26 MHz */
++		{300, 25, 1, -1, -1, -1, -1},	/* OPP 50 */
++		{-1, -1, -1, -1, -1, -1, -1},	/* OPP RESERVED	*/
++		{600, 25, 1, -1, -1, -1, -1},	/* OPP 100 */
++		{720, 25, 1, -1, -1, -1, -1},	/* OPP 120 */
++		{800, 25, 1, -1, -1, -1, -1},	/* OPP TB */
++		{1000, 25, 1, -1, -1, -1, -1}	/* OPP NT */
++	},
++};
++
++const struct dpll_params dpll_core[NUM_CRYSTAL_FREQ] = {
++		{625, 11, -1, -1, 10, 8, 4},	/* 19.2 MHz */
++		{1000, 23, -1, -1, 10, 8, 4},	/* 24 MHz */
++		{1000, 24, -1, -1, 10, 8, 4},	/* 25 MHz */
++		{1000, 25, -1, -1, 10, 8, 4}	/* 26 MHz */
++};
++
++const struct dpll_params dpll_per[NUM_CRYSTAL_FREQ] = {
++		{400, 7, 5, -1, -1, -1, -1},	/* 19.2 MHz */
++		{400, 9, 5, -1, -1, -1, -1},	/* 24 MHz */
++		{384, 9, 5, -1, -1, -1, -1},	/* 25 MHz */
++		{480, 12, 5, -1, -1, -1, -1}	/* 26 MHz */
++};
++
++const struct dpll_params epos_evm_dpll_ddr[NUM_CRYSTAL_FREQ] = {
++		{665, 47, 1, -1, 4, -1, -1}, /*19.2*/
++		{133, 11, 1, -1, 4, -1, -1}, /* 24 MHz */
++		{266, 24, 1, -1, 4, -1, -1}, /* 25 MHz */
++		{133, 12, 1, -1, 4, -1, -1}  /* 26 MHz */
++};
++
++const struct dpll_params gp_evm_dpll_ddr = {
++		50, 2, 1, -1, 2, -1, -1};
++
++//TODO: M2010 verify params
++const struct dpll_params ms_ocs_dpll_ddr = {
++		50, 2, 1, -1, 2, -1, -1};
++
++static const struct dpll_params idk_dpll_ddr = {
++	400, 23, 1, -1, 2, -1, -1
++};
++
++static const u32 ext_phy_ctrl_const_base_lpddr2[] = {
++	0x00500050,
++	0x00350035,
++	0x00350035,
++	0x00350035,
++	0x00350035,
++	0x00350035,
++	0x00000000,
++	0x00000000,
++	0x00000000,
++	0x00000000,
++	0x00000000,
++	0x00000000,
++	0x00000000,
++	0x00000000,
++	0x00000000,
++	0x00000000,
++	0x00000000,
++	0x00000000,
++	0x40001000,
++	0x08102040
++};
++
++const struct ctrl_ioregs ioregs_lpddr2 = {
++	.cm0ioctl		= LPDDR2_ADDRCTRL_IOCTRL_VALUE,
++	.cm1ioctl		= LPDDR2_ADDRCTRL_WD0_IOCTRL_VALUE,
++	.cm2ioctl		= LPDDR2_ADDRCTRL_WD1_IOCTRL_VALUE,
++	.dt0ioctl		= LPDDR2_DATA0_IOCTRL_VALUE,
++	.dt1ioctl		= LPDDR2_DATA0_IOCTRL_VALUE,
++	.dt2ioctrl		= LPDDR2_DATA0_IOCTRL_VALUE,
++	.dt3ioctrl		= LPDDR2_DATA0_IOCTRL_VALUE,
++	.emif_sdram_config_ext	= 0x1,
++};
++
++const struct emif_regs emif_regs_lpddr2 = {
++	.sdram_config			= 0x808012BA,
++	.ref_ctrl			= 0x0000040D,
++	.sdram_tim1			= 0xEA86B411,
++	.sdram_tim2			= 0x103A094A,
++	.sdram_tim3			= 0x0F6BA37F,
++	.read_idle_ctrl			= 0x00050000,
++	.zq_config			= 0x50074BE4,
++	.temp_alert_config		= 0x0,
++	.emif_rd_wr_lvl_rmp_win		= 0x0,
++	.emif_rd_wr_lvl_rmp_ctl		= 0x0,
++	.emif_rd_wr_lvl_ctl		= 0x0,
++	.emif_ddr_phy_ctlr_1		= 0x0E284006,
++	.emif_rd_wr_exec_thresh		= 0x80000405,
++	.emif_ddr_ext_phy_ctrl_1	= 0x04010040,
++	.emif_ddr_ext_phy_ctrl_2	= 0x00500050,
++	.emif_ddr_ext_phy_ctrl_3	= 0x00500050,
++	.emif_ddr_ext_phy_ctrl_4	= 0x00500050,
++	.emif_ddr_ext_phy_ctrl_5	= 0x00500050,
++	.emif_prio_class_serv_map	= 0x80000001,
++	.emif_connect_id_serv_1_map	= 0x80000094,
++	.emif_connect_id_serv_2_map	= 0x00000000,
++	.emif_cos_config			= 0x000FFFFF
++};
++
++const struct ctrl_ioregs ioregs_ddr3 = {
++	.cm0ioctl		= DDR3_ADDRCTRL_IOCTRL_VALUE,
++	.cm1ioctl		= DDR3_ADDRCTRL_WD0_IOCTRL_VALUE,
++	.cm2ioctl		= DDR3_ADDRCTRL_WD1_IOCTRL_VALUE,
++	.dt0ioctl		= DDR3_DATA0_IOCTRL_VALUE,
++	.dt1ioctl		= DDR3_DATA0_IOCTRL_VALUE,
++	.dt2ioctrl		= DDR3_DATA0_IOCTRL_VALUE,
++	.dt3ioctrl		= DDR3_DATA0_IOCTRL_VALUE,
++	.emif_sdram_config_ext	= 0xc163,
++};
++
++const struct emif_regs ddr3_emif_regs_400Mhz = {
++	.sdram_config			= 0x638413B2,
++	.ref_ctrl			= 0x00000C30,
++	.sdram_tim1			= 0xEAAAD4DB,
++	.sdram_tim2			= 0x266B7FDA,
++	.sdram_tim3			= 0x107F8678,
++	.read_idle_ctrl			= 0x00050000,
++	.zq_config			= 0x50074BE4,
++	.temp_alert_config		= 0x0,
++	.emif_ddr_phy_ctlr_1		= 0x0E004008,
++	.emif_ddr_ext_phy_ctrl_1	= 0x08020080,
++	.emif_ddr_ext_phy_ctrl_2	= 0x00400040,
++	.emif_ddr_ext_phy_ctrl_3	= 0x00400040,
++	.emif_ddr_ext_phy_ctrl_4	= 0x00400040,
++	.emif_ddr_ext_phy_ctrl_5	= 0x00400040,
++	.emif_rd_wr_lvl_rmp_win		= 0x0,
++	.emif_rd_wr_lvl_rmp_ctl		= 0x0,
++	.emif_rd_wr_lvl_ctl		= 0x0,
++	.emif_rd_wr_exec_thresh		= 0x80000405,
++	.emif_prio_class_serv_map	= 0x80000001,
++	.emif_connect_id_serv_1_map	= 0x80000094,
++	.emif_connect_id_serv_2_map	= 0x00000000,
++	.emif_cos_config		= 0x000FFFFF
++};
++
++/* EMIF DDR3 Configurations are different for beta AM43X GP EVMs */
++const struct emif_regs ddr3_emif_regs_400Mhz_beta = {
++	.sdram_config			= 0x638413B2,
++	.ref_ctrl			= 0x00000C30,
++	.sdram_tim1			= 0xEAAAD4DB,
++	.sdram_tim2			= 0x266B7FDA,
++	.sdram_tim3			= 0x107F8678,
++	.read_idle_ctrl			= 0x00050000,
++	.zq_config			= 0x50074BE4,
++	.temp_alert_config		= 0x0,
++	.emif_ddr_phy_ctlr_1		= 0x0E004008,
++	.emif_ddr_ext_phy_ctrl_1	= 0x08020080,
++	.emif_ddr_ext_phy_ctrl_2	= 0x00000065,
++	.emif_ddr_ext_phy_ctrl_3	= 0x00000091,
++	.emif_ddr_ext_phy_ctrl_4	= 0x000000B5,
++	.emif_ddr_ext_phy_ctrl_5	= 0x000000E5,
++	.emif_rd_wr_exec_thresh		= 0x80000405,
++	.emif_prio_class_serv_map	= 0x80000001,
++	.emif_connect_id_serv_1_map	= 0x80000094,
++	.emif_connect_id_serv_2_map	= 0x00000000,
++	.emif_cos_config		= 0x000FFFFF
++};
++
++/* EMIF DDR3 Configurations are different for production AM43X GP EVMs */
++const struct emif_regs ddr3_emif_regs_400Mhz_production = {
++	.sdram_config			= 0x638413B2,
++	.ref_ctrl			= 0x00000C30,
++	.sdram_tim1			= 0xEAAAD4DB,
++	.sdram_tim2			= 0x266B7FDA,
++	.sdram_tim3			= 0x107F8678,
++	.read_idle_ctrl			= 0x00050000,
++	.zq_config			= 0x50074BE4,
++	.temp_alert_config		= 0x0,
++	.emif_ddr_phy_ctlr_1		= 0x0E004008,
++	.emif_ddr_ext_phy_ctrl_1	= 0x08020080,
++	.emif_ddr_ext_phy_ctrl_2	= 0x00000066,
++	.emif_ddr_ext_phy_ctrl_3	= 0x00000091,
++	.emif_ddr_ext_phy_ctrl_4	= 0x000000B9,
++	.emif_ddr_ext_phy_ctrl_5	= 0x000000E6,
++	.emif_rd_wr_exec_thresh		= 0x80000405,
++	.emif_prio_class_serv_map	= 0x80000001,
++	.emif_connect_id_serv_1_map	= 0x80000094,
++	.emif_connect_id_serv_2_map	= 0x00000000,
++	.emif_cos_config		= 0x000FFFFF
++};
++
++/* 10/11/16  - EMIF timing updated  based on TI recommendation
++  * Note: HW levelling values in emif_ddr_ext_phy_ctlr_1 dont stick so 
++  * will be updated again in ext_phy_settings_hwlvl() */
++static const struct emif_regs ddr3_msocs_emif_regs_400Mhz = {
++	.sdram_config			= 0x61A01332, //0x638413B2
++	.sdram_config2			= 0x00000000,
++	.ref_ctrl				= 0x00000c30,
++	.sdram_tim1				= 0xeaaae51b, //0xeaaad4db,
++	.sdram_tim2				= 0x266b7fda,
++	.sdram_tim3				= 0x007f8678, //0x107f8678,
++	.read_idle_ctrl			= 0x00050000,
++	.zq_config				= 0x50075378, //0x50074be4,
++	.temp_alert_config		= 0x0,
++	.emif_ddr_phy_ctlr_1		= 0x00048008, //0x0e084008,
++	.emif_ddr_ext_phy_ctrl_1	= 0x10040100, //0x08020080,
++	.emif_ddr_ext_phy_ctrl_2	= 0x89,
++	.emif_ddr_ext_phy_ctrl_3	= 0x90,
++	.emif_ddr_ext_phy_ctrl_4	= 0x8e,
++	.emif_ddr_ext_phy_ctrl_5	= 0x8d,
++	.emif_rd_wr_lvl_rmp_win		= 0x0,
++	.emif_rd_wr_lvl_rmp_ctl		= 0x00000000,
++	.emif_rd_wr_lvl_ctl			= 0x00000000,
++	.emif_rd_wr_exec_thresh		= 0x80000000,
++	.emif_prio_class_serv_map	= 0x80000001,
++	.emif_connect_id_serv_1_map	= 0x80000094,
++	.emif_connect_id_serv_2_map	= 0x00000000,
++	.emif_cos_config			= 0x000FFFFF
++};
++
++static const struct emif_regs ddr3_idk_emif_regs_400Mhz = {
++	.sdram_config			= 0x61a11b32,
++	.sdram_config2			= 0x00000000,
++	.ref_ctrl			= 0x00000c30,
++	.sdram_tim1			= 0xeaaad4db,
++	.sdram_tim2			= 0x266b7fda,
++	.sdram_tim3			= 0x107f8678,
++	.read_idle_ctrl			= 0x00050000,
++	.zq_config			= 0x50074be4,
++	.temp_alert_config		= 0x00000000,
++	.emif_ddr_phy_ctlr_1		= 0x00008009,
++	.emif_ddr_ext_phy_ctrl_1	= 0x08020080,
++	.emif_ddr_ext_phy_ctrl_2	= 0x00000040,
++	.emif_ddr_ext_phy_ctrl_3	= 0x0000003e,
++	.emif_ddr_ext_phy_ctrl_4	= 0x00000051,
++	.emif_ddr_ext_phy_ctrl_5	= 0x00000051,
++	.emif_rd_wr_lvl_rmp_win		= 0x00000000,
++	.emif_rd_wr_lvl_rmp_ctl		= 0x00000000,
++	.emif_rd_wr_lvl_ctl		= 0x00000000,
++	.emif_rd_wr_exec_thresh		= 0x00000405,
++	.emif_prio_class_serv_map	= 0x00000000,
++	.emif_connect_id_serv_1_map	= 0x00000000,
++	.emif_connect_id_serv_2_map	= 0x00000000,
++	.emif_cos_config		= 0x00ffffff
++};
++
++
++void emif_get_ext_phy_ctrl_const_regs(const u32 **regs, u32 *size)
++{
++	if (board_is_eposevm()) {
++		*regs = ext_phy_ctrl_const_base_lpddr2;
++		*size = ARRAY_SIZE(ext_phy_ctrl_const_base_lpddr2);
++	}
++
++	return;
++}
++
++/*
++ * get_sys_clk_index : returns the index of the sys_clk read from
++ *			ctrl status register. This value is either
++ *			read from efuse or sysboot pins.
++ */
++static u32 get_sys_clk_index(void)
++{
++	struct ctrl_stat *ctrl = (struct ctrl_stat *)CTRL_BASE;
++	u32 ind = readl(&ctrl->statusreg), src;
++
++	src = (ind & CTRL_CRYSTAL_FREQ_SRC_MASK) >> CTRL_CRYSTAL_FREQ_SRC_SHIFT;
++	if (src == CTRL_CRYSTAL_FREQ_SRC_EFUSE) /* Value read from EFUSE */
++		return ((ind & CTRL_CRYSTAL_FREQ_SELECTION_MASK) >>
++			CTRL_CRYSTAL_FREQ_SELECTION_SHIFT);
++	else /* Value read from SYS BOOT pins */
++		return ((ind & CTRL_SYSBOOT_15_14_MASK) >>
++			CTRL_SYSBOOT_15_14_SHIFT);
++}
++
++const struct dpll_params *get_dpll_ddr_params(void)
++{
++	return &ms_ocs_dpll_ddr;
++}
++
++
++/*
++ * get_opp_offset:
++ * Returns the index for safest OPP of the device to boot.
++ * max_off:	Index of the MAX OPP in DEV ATTRIBUTE register.
++ * min_off:	Index of the MIN OPP in DEV ATTRIBUTE register.
++ * This data is read from dev_attribute register which is e-fused.
++ * A'1' in bit indicates OPP disabled and not available, a '0' indicates
++ * OPP available. Lowest OPP starts with min_off. So returning the
++ * bit with rightmost '0'.
++ */
++static int get_opp_offset(int max_off, int min_off)
++{
++	struct ctrl_stat *ctrl = (struct ctrl_stat *)CTRL_BASE;
++	int opp, offset, i;
++
++	/* Bits 0:11 are defined to be the MPU_MAX_FREQ */
++	opp = readl(&ctrl->dev_attr) & ~0xFFFFF000;
++
++	for (i = max_off; i >= min_off; i--) {
++		offset = opp & (1 << i);
++		if (!offset)
++			return i;
++	}
++
++	return min_off;
++}
++
++const struct dpll_params *get_dpll_mpu_params(void)
++{
++	int opp = get_opp_offset(DEV_ATTR_MAX_OFFSET, DEV_ATTR_MIN_OFFSET);
++	u32 ind = get_sys_clk_index();
++
++	return &dpll_mpu[ind][opp];
++}
++
++const struct dpll_params *get_dpll_core_params(void)
++{
++	int ind = get_sys_clk_index();
++
++	return &dpll_core[ind];
++}
++
++const struct dpll_params *get_dpll_per_params(void)
++{
++	int ind = get_sys_clk_index();
++
++	return &dpll_per[ind];
++}
++
++void scale_vcores_generic(u32 m)
++{
++	int mpu_vdd;
++
++	if (i2c_probe(TPS65218_CHIP_PM))
++		return;
++
++	switch (m) {
++	case 1000:
++		mpu_vdd = TPS65218_DCDC_VOLT_SEL_1330MV;
++		break;
++	case 800:
++		mpu_vdd = TPS65218_DCDC_VOLT_SEL_1260MV;
++		break;
++	case 720:
++		mpu_vdd = TPS65218_DCDC_VOLT_SEL_1200MV;
++		break;
++	case 600:
++		mpu_vdd = TPS65218_DCDC_VOLT_SEL_1100MV;
++		break;
++	case 300:
++		mpu_vdd = TPS65218_DCDC_VOLT_SEL_0950MV;
++		break;
++	default:
++		puts("Unknown MPU clock, not scaling\n");
++		return;
++	}
++
++	/* Set DCDC1 (CORE) voltage to 1.1V */
++	if (tps65218_voltage_update(TPS65218_DCDC1,
++				    TPS65218_DCDC_VOLT_SEL_1100MV)) {
++		printf("%s failure\n", __func__);
++		return;
++	}
++
++	/* Set DCDC2 (MPU) voltage */
++	if (tps65218_voltage_update(TPS65218_DCDC2, mpu_vdd)) {
++		printf("%s failure\n", __func__);
++		return;
++	}
++}
++
++void scale_vcores_idk(u32 m)
++{
++	int mpu_vdd;
++
++	if (i2c_probe(TPS62362_I2C_ADDR))
++		return;
++
++	switch (m) {
++	case 1000:
++		mpu_vdd = TPS62362_DCDC_VOLT_SEL_1330MV;
++		break;
++	case 800:
++		mpu_vdd = TPS62362_DCDC_VOLT_SEL_1260MV;
++		break;
++	case 720:
++		mpu_vdd = TPS62362_DCDC_VOLT_SEL_1200MV;
++		break;
++	case 600:
++		mpu_vdd = TPS62362_DCDC_VOLT_SEL_1100MV;
++		break;
++	case 300:
++		mpu_vdd = TPS62362_DCDC_VOLT_SEL_1330MV;
++		break;
++	default:
++		puts("Unknown MPU clock, not scaling\n");
++		return;
++	}
++
++	/* Set VDD_MPU voltage */
++	if (tps62362_voltage_update(TPS62362_SET3, mpu_vdd)) {
++		printf("%s failure\n", __func__);
++		return;
++	}
++}
++
++void gpi2c_init(void)
++{
++	static bool first_time = true;
++
++	if (first_time) {
++		enable_i2c0_pin_mux();
++		i2c_init(CONFIG_SYS_OMAP24_I2C_SPEED, CONFIG_SYS_OMAP24_I2C_SLAVE);
++
++		first_time = false;
++	}
++}
++
++void scale_vcores(void)
++{
++	const struct dpll_params *mpu_params;
++
++	/* Init i2c for PMIC config */
++	gpi2c_init();
++
++	/* Get the frequency */
++	mpu_params = get_dpll_mpu_params();
++
++	scale_vcores_generic(mpu_params->m);
++}
++
++void set_uart_mux_conf(void)
++{
++	//enable_uart0_pin_mux();
++	enable_uart1_pin_mux();
++}
++
++void set_mux_conf_regs(void)
++{
++	enable_board_pin_mux();
++}
++
++#if 0
++static void enable_vtt_regulator(void)
++{
++	u32 temp;
++
++	/* enable module */
++	writel(GPIO_CTRL_ENABLEMODULE, AM33XX_GPIO5_BASE + OMAP_GPIO_CTRL);
++
++	/* enable output for GPIO5_7 */
++	writel(GPIO_SETDATAOUT(7),
++	       AM33XX_GPIO5_BASE + OMAP_GPIO_SETDATAOUT);
++	temp = readl(AM33XX_GPIO5_BASE + OMAP_GPIO_OE);
++	temp = temp & ~(GPIO_OE_ENABLE(7));
++	writel(temp, AM33XX_GPIO5_BASE + OMAP_GPIO_OE);
++}
++#endif
++
++enum {
++	RTC_BOARD_EPOS = 1,
++	RTC_BOARD_EVM14,
++	RTC_BOARD_EVM12,
++	RTC_BOARD_GPEVM,
++	RTC_BOARD_SK,
++};
++
++/*
++ * In the rtc_only boot path we have the board type info in the rtc scratch pad
++ * register hence we bypass the costly i2c reads to eeprom and directly program
++ * the board name string
++ */
++void rtc_only_update_board_type(u32 btype)
++{
++	const char *name = "";
++	const char *rev = "1.0";
++
++	switch (btype) {
++	case RTC_BOARD_EPOS:
++		name = "AM43EPOS";
++		break;
++	case RTC_BOARD_EVM14:
++		name = "AM43__GP";
++		rev = "1.4";
++		break;
++	case RTC_BOARD_EVM12:
++		name = "AM43__GP";
++		rev = "1.2";
++		break;
++	case RTC_BOARD_GPEVM:
++		name = "AM43__GP";
++		break;
++	case RTC_BOARD_SK:
++		name = "AM43__SK";
++		break;
++	}
++	ti_i2c_eeprom_am_set(name, rev);
++}
++
++u32 rtc_only_get_board_type(void)
++{
++	/* Should not read the eeprom since we already set up properties */
++	if (read_eeprom() < 0)
++		return -1;
++
++	if (board_is_eposevm())
++		return RTC_BOARD_EPOS;
++	else if (board_is_evm_14_or_later())
++		return RTC_BOARD_EVM14;
++	else if (board_is_evm_12_or_later())
++		return RTC_BOARD_EVM12;
++	else if (board_is_evm())
++		return RTC_BOARD_GPEVM;
++	else if (board_is_sk())
++		return RTC_BOARD_SK;
++
++	return 0;
++}
++
++void sdram_init(void)
++{
++	config_ddr(400, &ioregs_ddr3, NULL, NULL,
++		   &ddr3_msocs_emif_regs_400Mhz, 0);
++}
++#endif
++
++/* setup board specific PMIC */
++int power_init_board(void)
++{
++	struct pmic *p;
++
++	power_tps65218_init(I2C_PMIC);
++	p = pmic_get("TPS65218_PMIC");
++	if (p && !pmic_probe(p))
++		puts("PMIC:  TPS65218\n");
++
++	return 0;
++}
++int ocs_eeprom_init(void)
++{
++	int rc;
++
++	gpi2c_init();
++	
++	rc = i2c_set_bus_num(CONFIG_EEPROM_BUS_ADDRESS);
++
++	if (rc)
++		return rc;
++
++	return(i2c_probe(CONFIG_SYS_I2C_EEPROM_ADDR));
++}
++
++int ocs_i2c_eeprom_get_macid(uint8_t *mac1, uint8_t *mac2)
++{
++	int rc;
++	uint8_t machdr[2];
++
++	rc = i2c_read(CONFIG_SYS_I2C_EEPROM_ADDR, CONFIG_EEPROM_OFFSET_MACIDHDR, 2, (uint8_t *)machdr, 2);
++
++	if (!rc)
++		rc = (machdr[0] != 0x0C) || (machdr[1] != 0x00);
++
++	if (!rc) {
++		rc = i2c_read(CONFIG_SYS_I2C_EEPROM_ADDR, CONFIG_EEPROM_OFFSET_MACID1, 2, (uint8_t *)mac1, 6);
++	}
++
++	if (!rc)
++		rc = i2c_read(CONFIG_SYS_I2C_EEPROM_ADDR, CONFIG_EEPROM_OFFSET_MACID2, 2, (uint8_t *)mac2, 6);
++	return( rc );
++}
++
++int board_init(void)
++{
++	struct l3f_cfg_bwlimiter *bwlimiter = (struct l3f_cfg_bwlimiter *)L3F_CFG_BWLIMITER;
++	u32 mreqprio_0, mreqprio_1, modena_init0_bw_fractional,
++	    modena_init0_bw_integer, modena_init0_watermark_0;
++
++	//u32 temp
++#if defined(CONFIG_QSPI_BOOT)
++	save_omap_boot_params();
++#endif
++
++	gd->bd->bi_boot_params = CONFIG_SYS_SDRAM_BASE + 0x100;
++	gpmc_init();
++
++	/* Clear all important bits for DSS errata that may need to be tweaked*/
++	mreqprio_0 = readl(&cdev->mreqprio_0) & MREQPRIO_0_SAB_INIT1_MASK &
++	                   MREQPRIO_0_SAB_INIT0_MASK;
++
++	mreqprio_1 = readl(&cdev->mreqprio_1) & MREQPRIO_1_DSS_MASK;
++
++	modena_init0_bw_fractional = readl(&bwlimiter->modena_init0_bw_fractional) &
++	                                   BW_LIMITER_BW_FRAC_MASK;
++
++	modena_init0_bw_integer = readl(&bwlimiter->modena_init0_bw_integer) &
++	                                BW_LIMITER_BW_INT_MASK;
++
++	modena_init0_watermark_0 = readl(&bwlimiter->modena_init0_watermark_0) &
++	                                 BW_LIMITER_BW_WATERMARK_MASK;
++
++	/* Setting MReq Priority of the DSS*/
++	mreqprio_0 |= 0x77;
++
++	/*
++	 * Set L3 Fast Configuration Register
++	 * Limiting bandwith for ARM core to 700 MBPS
++	 */
++	modena_init0_bw_fractional |= 0x10;
++	modena_init0_bw_integer |= 0x3;
++
++	writel(mreqprio_0, &cdev->mreqprio_0);
++	writel(mreqprio_1, &cdev->mreqprio_1);
++
++	writel(modena_init0_bw_fractional, &bwlimiter->modena_init0_bw_fractional);
++	writel(modena_init0_bw_integer, &bwlimiter->modena_init0_bw_integer);
++	writel(modena_init0_watermark_0, &bwlimiter->modena_init0_watermark_0);
++
++	/* enable module */
++	//writel(GPIO_CTRL_ENABLEMODULE, AM33XX_GPIO5_BASE + OMAP_GPIO_CTRL);
++
++	/* enable output for GPIO5_28 */
++	//temp = readl(AM33XX_GPIO5_BASE + OMAP_GPIO_OE);
++	//temp = temp & ~(GPIO_OE_ENABLE(28));
++	//writel(temp, AM33XX_GPIO5_BASE + OMAP_GPIO_OE);
++	//writel(GPIO_SETDATAOUT(28), AM33XX_GPIO5_BASE + OMAP_GPIO_SETDATAOUT);
++
++	return 0;
++}
++
++#ifdef CONFIG_BOARD_LATE_INIT
++#define BOOTPARAMS_RESET_WDRST		0x10
++int board_late_init(void)
++{
++#if defined(CONFIG_QSPI_BOOT)
++	ulong wdrstcount = 0;
++
++	//printf("Boot device: %x | Reset reason: %x\n", 
++	//			gd->arch.omap_boot_params.omap_bootdevice,
++	//			gd->arch.omap_boot_params.reset_reason);
++	//setenv_hex("bootdev", gd->arch.omap_boot_params.omap_bootdevice);
++
++	wdrstcount = getenv_hex("wdresetcount", 0);
++	if (gd->arch.omap_boot_params.reset_reason & BOOTPARAMS_RESET_WDRST) {
++		setenv_hex("wdresetcount", wdrstcount+1);
++		saveenv();
++		//Clear WD reset bitflag
++		writel(BOOTPARAMS_RESET_WDRST, (void *)PRM_RSTST);
++	}
++	else
++		setenv_hex("wdresetcount", wdrstcount);
++#endif
++
++#if defined(CONFIG_HW_WATCHDOG)
++	struct wd_timer *wdt = (struct wd_timer *)WDT_BASE;
++
++	hw_watchdog_init();
++	printf("Watchdog %s. Timeout set to %d ms\n", 
++				(readl(&wdt->wdtwspr) == 0x4444)?"enabled":"disabled", 
++				(0xFFFFFFFF - readl(&wdt->wdtwldr)) * 1000 / 32768);
++#endif
++
++#ifdef CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG
++	setenv("board_name", "OCS_M2010_MB");
++	setenv("board_rev", "1");
++	setenv("board_serial", "00000001");
++	//set_board_info_env(NULL);
++#endif
++	return 0;
++}
++#endif
++
++#ifdef CONFIG_USB_DWC3
++static struct dwc3_device usb_otg_ss1 = {
++	.maximum_speed = USB_SPEED_HIGH,
++	.base = USB_OTG_SS1_BASE,
++	.tx_fifo_resize = false,
++	.index = 0,
++};
++
++static struct dwc3_omap_device usb_otg_ss1_glue = {
++	.base = (void *)USB_OTG_SS1_GLUE_BASE,
++	.utmi_mode = DWC3_OMAP_UTMI_MODE_SW,
++	.index = 0,
++};
++
++static struct ti_usb_phy_device usb_phy1_device = {
++	.usb2_phy_power = (void *)USB2_PHY1_POWER,
++	.index = 0,
++};
++
++static struct dwc3_device usb_otg_ss2 = {
++	.maximum_speed = USB_SPEED_HIGH,
++	.base = USB_OTG_SS2_BASE,
++	.tx_fifo_resize = false,
++	.index = 1,
++};
++
++static struct dwc3_omap_device usb_otg_ss2_glue = {
++	.base = (void *)USB_OTG_SS2_GLUE_BASE,
++	.utmi_mode = DWC3_OMAP_UTMI_MODE_SW,
++	.index = 1,
++};
++
++static struct ti_usb_phy_device usb_phy2_device = {
++	.usb2_phy_power = (void *)USB2_PHY2_POWER,
++	.index = 1,
++};
++
++int board_usb_init(int index, enum usb_init_type init)
++{
++	enable_usb_clocks(index);
++	switch (index) {
++	case 0:
++		if (init == USB_INIT_DEVICE) {
++			usb_otg_ss1.dr_mode = USB_DR_MODE_PERIPHERAL;
++			usb_otg_ss1_glue.vbus_id_status = OMAP_DWC3_VBUS_VALID;
++		} else {
++			usb_otg_ss1.dr_mode = USB_DR_MODE_HOST;
++			usb_otg_ss1_glue.vbus_id_status = OMAP_DWC3_ID_GROUND;
++		}
++
++		dwc3_omap_uboot_init(&usb_otg_ss1_glue);
++		ti_usb_phy_uboot_init(&usb_phy1_device);
++		dwc3_uboot_init(&usb_otg_ss1);
++		break;
++	case 1:
++		if (init == USB_INIT_DEVICE) {
++			usb_otg_ss2.dr_mode = USB_DR_MODE_PERIPHERAL;
++			usb_otg_ss2_glue.vbus_id_status = OMAP_DWC3_VBUS_VALID;
++		} else {
++			usb_otg_ss2.dr_mode = USB_DR_MODE_HOST;
++			usb_otg_ss2_glue.vbus_id_status = OMAP_DWC3_ID_GROUND;
++		}
++
++		ti_usb_phy_uboot_init(&usb_phy2_device);
++		dwc3_omap_uboot_init(&usb_otg_ss2_glue);
++		dwc3_uboot_init(&usb_otg_ss2);
++		break;
++	default:
++		printf("Invalid Controller Index\n");
++	}
++
++	return 0;
++}
++
++int board_usb_cleanup(int index, enum usb_init_type init)
++{
++	switch (index) {
++	case 0:
++	case 1:
++		ti_usb_phy_uboot_exit(index);
++		dwc3_uboot_exit(index);
++		dwc3_omap_uboot_exit(index);
++		break;
++	default:
++		printf("Invalid Controller Index\n");
++	}
++	disable_usb_clocks(index);
++
++	return 0;
++}
++
++int usb_gadget_handle_interrupts(int index)
++{
++	u32 status;
++
++	status = dwc3_omap_uboot_interrupt_status(index);
++	if (status)
++		dwc3_uboot_handle_interrupt(index);
++
++	return 0;
++}
++#endif
++
++#if (defined(CONFIG_DRIVER_TI_CPSW) && !defined(CONFIG_SPL_BUILD)) || \
++	(defined(CONFIG_SPL_ETH_SUPPORT) && defined(CONFIG_SPL_BUILD))
++static void cpsw_control(int enabled)
++{
++	/* Additional controls can be added here */
++	return;
++}
++
++static struct cpsw_slave_data cpsw_slaves[] = {
++	{
++		.slave_reg_ofs	= 0x208,
++		.sliver_reg_ofs	= 0xd80,
++		.phy_addr	= 16,
++	},
++	{
++		.slave_reg_ofs	= 0x308,
++		.sliver_reg_ofs	= 0xdc0,
++		.phy_addr	= 1,
++	},
++};
++
++static struct cpsw_platform_data cpsw_data = {
++	.mdio_base		= CPSW_MDIO_BASE,
++	.cpsw_base		= CPSW_BASE,
++	.mdio_div		= 0xff,
++	.channels		= 8,
++	.cpdma_reg_ofs	= 0x800,
++	.slaves			= 2,
++	.slave_data		= cpsw_slaves,
++	.ale_reg_ofs		= 0xd00,
++	.ale_entries		= 1024,
++	.host_port_reg_ofs	= 0x108,
++	.hw_stats_reg_ofs	= 0x900,
++	.bd_ram_ofs		= 0x2000,
++	.mac_control	= (1 << 5),
++	.control		= cpsw_control,
++	.host_port_num	= 0,
++	.active_slave	= 0,
++	.version		= CPSW_CTRL_VERSION_2,
++};
++#endif
++
++/*
++ * This function will:
++ * Read the eFuse for MAC addresses, and set ethaddr/eth1addr/usbnet_devaddr
++ * in the environment
++ * Perform fixups to the PHY present on certain boards.  We only need this
++ * function in:
++ * - SPL with either CPSW or USB ethernet support
++ * - Full U-Boot, with either CPSW or USB ethernet
++ * Build in only these cases to avoid warnings about unused variables
++ * when we build an SPL that has neither option but full U-Boot will.
++ */
++#if ((defined(CONFIG_SPL_ETH_SUPPORT) || \
++	defined(CONFIG_SPL_USBETH_SUPPORT)) && \
++	defined(CONFIG_SPL_BUILD)) || \
++	((defined(CONFIG_DRIVER_TI_CPSW) || \
++	  defined(CONFIG_USB_ETHER)) && !defined(CONFIG_SPL_BUILD))
++int board_eth_init(bd_t *bis)
++{
++	int rv = 0;
++	uint8_t mac_addr[2][6];
++	uint32_t mac_hi, mac_lo;
++
++	/* Init i2c and EEPROM */
++	ocs_eeprom_init();
++
++	rv = ocs_i2c_eeprom_get_macid(mac_addr[0], mac_addr[1]);
++
++	if (!rv)
++	{		
++		if (is_valid_ethaddr(mac_addr[0]))
++			eth_setenv_enetaddr("ethaddr", mac_addr[0]);
++		if (is_valid_ethaddr(mac_addr[1]))
++			eth_setenv_enetaddr("eth1addr", mac_addr[1]);
++
++		writel(RGMII_MODE_ENABLE, &cdev->miisel);
++		cpsw_slaves[0].phy_if = PHY_INTERFACE_MODE_RGMII;
++		cpsw_slaves[0].phy_addr = 1;
++
++		cpsw_slaves[1].phy_if = PHY_INTERFACE_MODE_RGMII;
++		cpsw_slaves[1].phy_addr = 2;
++
++		rv = cpsw_register(&cpsw_data);
++		if (rv < 0) {
++			printf("Error %d registering CPSW switch\n", rv);
++			return rv;
++		}
++	}
++	else
++	{
++		printf("Failed to get MACID from EEPROM, trying E-fuse..\n");
++
++		/* try reading mac address from efuse */
++		mac_lo = readl(&cdev->macid0l);
++		mac_hi = readl(&cdev->macid0h);
++		mac_addr[0][0] = mac_hi & 0xFF;
++		mac_addr[0][1] = (mac_hi & 0xFF00) >> 8;
++		mac_addr[0][2] = (mac_hi & 0xFF0000) >> 16;
++		mac_addr[0][3] = (mac_hi & 0xFF000000) >> 24;
++		mac_addr[0][4] = mac_lo & 0xFF;
++		mac_addr[0][5] = (mac_lo & 0xFF00) >> 8;
++
++		if (!getenv("ethaddr")) {
++			puts("<ethaddr> not set. Validating first E-fuse MAC ID\n");
++			if (is_valid_ethaddr(mac_addr[0]))
++				eth_setenv_enetaddr("ethaddr", mac_addr[0]);
++		}
++
++		mac_lo = readl(&cdev->macid1l);
++		mac_hi = readl(&cdev->macid1h);
++		mac_addr[1][0] = mac_hi & 0xFF;
++		mac_addr[1][1] = (mac_hi & 0xFF00) >> 8;
++		mac_addr[1][2] = (mac_hi & 0xFF0000) >> 16;
++		mac_addr[1][3] = (mac_hi & 0xFF000000) >> 24;
++		mac_addr[1][4] = mac_lo & 0xFF;
++		mac_addr[1][5] = (mac_lo & 0xFF00) >> 8;
++
++		if (!getenv("eth1addr")) {
++			puts("<eth1addr> not set. Validating second E-fuse MAC ID\n");
++			if (is_valid_ethaddr(mac_addr[1]))
++				eth_setenv_enetaddr("eth1addr", mac_addr[1]);
++		}
++
++		writel(RGMII_MODE_ENABLE, &cdev->miisel);
++		cpsw_slaves[0].phy_if = PHY_INTERFACE_MODE_RGMII;
++		cpsw_slaves[0].phy_addr = 1;
++		
++		cpsw_slaves[1].phy_if = PHY_INTERFACE_MODE_RGMII;
++		cpsw_slaves[1].phy_addr = 2;
++
++		rv = cpsw_register(&cpsw_data);
++		if (rv < 0) {
++			printf("Error %d registering CPSW switch\n", rv);
++			return rv;
++		}
++	}
++
++	return rv;
++}
++
++#endif
++
+diff --git a/board/ti/am43xx_ocs/board.h b/board/ti/am43xx_ocs/board.h
+new file mode 100644
+index 0000000..778a524
+--- /dev/null
++++ b/board/ti/am43xx_ocs/board.h
+@@ -0,0 +1,64 @@
++/*
++ * board.h
++ *
++ * TI AM437x boards information header
++ * Derived from AM335x board.
++ *
++ * Copyright (C) 2013, Texas Instruments, Incorporated - http://www.ti.com/
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#ifndef _BOARD_H_
++#define _BOARD_H_
++
++#include <asm/arch/omap.h>
++
++#define DEV_ATTR_MAX_OFFSET    5
++#define DEV_ATTR_MIN_OFFSET    0
++
++static inline int board_is_eposevm(void)
++{
++	return board_ti_is("AM43EPOS");
++}
++
++static inline int board_is_gpevm(void)
++{
++	return board_ti_is("AM43__GP");
++}
++
++static inline int board_is_sk(void)
++{
++	return board_ti_is("AM43__SK");
++}
++
++static inline int board_is_idk(void)
++{
++	return board_ti_is("AM43_IDK");
++}
++
++static inline int board_is_hsevm(void)
++{
++	return board_ti_is("AM43XXHS");
++}
++
++static inline int board_is_evm(void)
++{
++	return board_is_gpevm() || board_is_hsevm();
++}
++
++static inline int board_is_evm_14_or_later(void)
++{
++	return board_is_evm() && strncmp("1.4", board_ti_get_rev(), 3) <= 0;
++}
++
++static inline int board_is_evm_12_or_later(void)
++{
++	return board_is_evm() && strncmp("1.2", board_ti_get_rev(), 3) <= 0;
++}
++
++void enable_uart0_pin_mux(void);
++void enable_uart1_pin_mux(void);
++void enable_board_pin_mux(void);
++void enable_i2c0_pin_mux(void);
++#endif
+diff --git a/board/ti/am43xx_ocs/mux.c b/board/ti/am43xx_ocs/mux.c
+new file mode 100644
+index 0000000..ab7338a
+--- /dev/null
++++ b/board/ti/am43xx_ocs/mux.c
+@@ -0,0 +1,144 @@
++/*
++ * mux.c
++ *
++ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#include <common.h>
++#include <asm/arch/sys_proto.h>
++#include <asm/arch/mux.h>
++#include <board-common/board_detect.h>
++#include "board.h"
++
++static struct module_pin_mux rgmii1_pin_mux[] = {
++	{OFFSET(mii1_txd0), MODE(2)},				/* RGMII1_TD0 */
++	{OFFSET(mii1_txd1), MODE(2)},				/* RGMII1_TD1 */
++	{OFFSET(mii1_txd2), MODE(2)},				/* RGMII1_TD2 */
++	{OFFSET(mii1_txd3), MODE(2)},				/* RGMII1_TD3 */
++	{OFFSET(mii1_txclk), MODE(2)},				/* RGMII1_TCLK */
++	{OFFSET(mii1_txen), MODE(2)},				/* RGMII1_TCTL */	
++	{OFFSET(mii1_rxd0), MODE(2) | RXACTIVE},	/* RGMII1_RD0 */
++	{OFFSET(mii1_rxd1), MODE(2) | RXACTIVE},	/* RGMII1_RD1 */
++	{OFFSET(mii1_rxd2), MODE(2) | RXACTIVE},	/* RGMII1_RD2 */
++	{OFFSET(mii1_rxd3), MODE(2) | RXACTIVE},	/* RGMII1_RD3 */	
++	{OFFSET(mii1_rxclk), MODE(2) | RXACTIVE},	/* RGMII1_RCLK */
++	{OFFSET(mii1_rxdv), MODE(2) | RXACTIVE},	/* RGMII1_RCTL */
++	{-1},
++};
++
++static struct module_pin_mux rgmii2_pin_mux[] = {
++	{OFFSET(gpmc_a5), MODE(2)},					/* RGMII2_TD0 */
++	{OFFSET(gpmc_a4), MODE(2)},					/* RGMII2_TD1 */
++	{OFFSET(gpmc_a3), MODE(2)},					/* RGMII2_TD2 */
++	{OFFSET(gpmc_a2), MODE(2)},					/* RGMII2_TD3 */
++	{OFFSET(gpmc_a6), MODE(2)},					/* RGMII2_TCLK */
++	{OFFSET(gpmc_a0), MODE(2)},					/* RGMII2_TCTL */	
++	{OFFSET(gpmc_a11), MODE(2) | RXACTIVE},		/* RGMII2_RD0 */
++	{OFFSET(gpmc_a10), MODE(2) | RXACTIVE},		/* RGMII2_RD1 */
++	{OFFSET(gpmc_a9), MODE(2) | RXACTIVE},		/* RGMII2_RD2 */
++	{OFFSET(gpmc_a8), MODE(2) | RXACTIVE},		/* RGMII2_RD3 */	
++	{OFFSET(gpmc_a7), MODE(2) | RXACTIVE},		/* RGMII2_RCLK */
++	{OFFSET(gpmc_a1), MODE(2) | RXACTIVE},		/* RGMII2_RCTL */
++	{-1},
++};
++
++static struct module_pin_mux mdio_pin_mux[] = {
++	{OFFSET(mdio_data), MODE(0) | RXACTIVE | PULLUP_EN},/* MDIO_DATA */
++	{OFFSET(mdio_clk), MODE(0) | PULLUP_EN},	/* MDIO_CLK */
++	{-1},
++};
++
++static struct module_pin_mux uart0_pin_mux[] = {
++	{OFFSET(uart0_rxd), (MODE(0) | PULLUP_EN | RXACTIVE | SLEWCTRL)},
++	{OFFSET(uart0_txd), (MODE(0) | PULLUDDIS | PULLUP_EN | SLEWCTRL)},
++	{-1},
++};
++
++static struct module_pin_mux uart1_pin_mux[] = {
++	{OFFSET(uart1_rxd), (MODE(0) | PULLUP_EN | RXACTIVE | SLEWCTRL)},
++	{OFFSET(uart1_txd), (MODE(0) | PULLUDDIS | PULLUP_EN | SLEWCTRL)},
++	{-1},
++};
++
++/*
++
++{OFFSET(uart1_ctsn), (MODE(0) | PULLUP_EN | RXACTIVE | SLEWCTRL)},
++{OFFSET(mmc0_dat2), (MODE(0) | PULLUP_EN | RXACTIVE | SLEWCTRL)},
++{OFFSET(uart1_txd), (MODE(0) | PULLUDDIS | PULLUP_EN | SLEWCTRL)},
++{OFFSET(uart1_rtsn), (MODE(0) | PULLUDDIS | PULLUP_EN | SLEWCTRL)}, 
++
++*/
++
++static struct module_pin_mux emmc_pin_mux[] = {
++	{OFFSET(gpmc_ad8),	(MODE(2) | PULLUP_EN | RXACTIVE)}, /* AD0 */
++	{OFFSET(gpmc_ad9),	(MODE(2) | PULLUP_EN | RXACTIVE)}, /* AD1 */
++	{OFFSET(gpmc_ad10),	(MODE(2) | PULLUP_EN | RXACTIVE)}, /* AD2 */
++	{OFFSET(gpmc_ad11),	(MODE(2) | PULLUP_EN | RXACTIVE)}, /* AD3 */
++	{OFFSET(gpmc_ad12),	(MODE(2) | PULLUP_EN | RXACTIVE)}, /* AD4 */
++	{OFFSET(gpmc_ad13),	(MODE(2) | PULLUP_EN | RXACTIVE)}, /* AD5 */
++	{OFFSET(gpmc_ad14),	(MODE(2) | PULLUP_EN | RXACTIVE)}, /* AD6 */
++	{OFFSET(gpmc_ad15),	(MODE(2) | PULLUP_EN | RXACTIVE)}, /* AD7 */
++
++	{OFFSET(gpmc_csn1), (MODE(2) | PULLUP_EN | RXACTIVE)},  /* MMC1_CLK */
++	{OFFSET(gpmc_csn2), (MODE(2) | PULLUP_EN | RXACTIVE)},  /* MMC1_CMD */
++	{-1},
++};
++
++static __maybe_unused struct module_pin_mux qspi_pin_mux[] = {
++	{OFFSET(gpmc_csn0),		(MODE(3) | PULLUP_EN | RXACTIVE)}, 	/* QSPI_CSN */
++	{OFFSET(gpmc_csn3), 	(MODE(2) | PULLUP_EN | RXACTIVE)}, 	/* QSPI_CLK */
++	{OFFSET(gpmc_advn_ale), (MODE(3) | PULLUP_EN | RXACTIVE)},	/* QSPI_D0 */
++	{OFFSET(gpmc_oen_ren), 	(MODE(3) | PULLUP_EN | RXACTIVE)}, 	/* QSPI_D1 */
++	{OFFSET(gpmc_wen), 		(MODE(3) | PULLUP_EN | RXACTIVE)},	/* QSPI_D2 */
++	{OFFSET(gpmc_be0n_cle), (MODE(3) | PULLUP_EN | RXACTIVE)},	/* QSPI_D3 */
++	{-1},
++};
++
++static struct module_pin_mux i2c0_pin_mux[] = {
++	{OFFSET(i2c0_sda), (MODE(0) | PULLUP_EN | RXACTIVE | SLEWCTRL)},
++	{OFFSET(i2c0_scl), (MODE(0) | PULLUP_EN | RXACTIVE | SLEWCTRL)},
++	{-1},
++};
++
++static struct module_pin_mux i2c1_pin_mux[] = {
++	{OFFSET(spi0_cs0), (MODE(2) | PULLUP_EN | RXACTIVE | SLEWCTRL)},
++	{OFFSET(spi0_d1), (MODE(2) | PULLUP_EN | RXACTIVE | SLEWCTRL)},
++	{-1},
++};
++
++static struct module_pin_mux fw_ready_buff_enable[] = {
++	{OFFSET(usb1_drvvbus), (MODE(7) | PULLUP_EN)},				/* GPIO3_13 */
++	{-1},
++};
++
++
++
++void enable_uart0_pin_mux(void)
++{
++	configure_module_pin_mux(uart0_pin_mux);
++}
++
++void enable_uart1_pin_mux(void)
++{
++	configure_module_pin_mux(uart1_pin_mux);
++}
++
++void enable_board_pin_mux(void)
++{
++	configure_module_pin_mux(i2c0_pin_mux);
++	configure_module_pin_mux(mdio_pin_mux);
++	configure_module_pin_mux(i2c1_pin_mux);
++	configure_module_pin_mux(emmc_pin_mux);
++	configure_module_pin_mux(rgmii1_pin_mux);
++	configure_module_pin_mux(rgmii2_pin_mux);
++	configure_module_pin_mux(qspi_pin_mux);
++	configure_module_pin_mux(fw_ready_buff_enable);
++}
++
++void enable_i2c0_pin_mux(void)
++{
++	configure_module_pin_mux(i2c0_pin_mux);
++	configure_module_pin_mux(i2c1_pin_mux);
++}
+diff --git a/common/cmd_bootmenu.c b/common/cmd_bootmenu.c
+index 5879065..803bf37 100644
+--- a/common/cmd_bootmenu.c
++++ b/common/cmd_bootmenu.c
+@@ -312,6 +312,7 @@ static struct bootmenu_data *bootmenu_create(int delay)
+ 			break;
+ 	}
+ 
++#ifndef CONFIG_MENU_NO_UBCONSOLE
+ 	/* Add U-Boot console entry at the end */
+ 	if (i <= MAX_COUNT - 1) {
+ 		entry = malloc(sizeof(struct bootmenu_entry));
+@@ -345,6 +346,7 @@ static struct bootmenu_data *bootmenu_create(int delay)
+ 		iter = entry;
+ 		++i;
+ 	}
++#endif
+ 
+ 	menu->count = i;
+ 	return menu;
+diff --git a/configs/am43xx_ocs_emmcboot_defconfig b/configs/am43xx_ocs_emmcboot_defconfig
+new file mode 100644
+index 0000000..46a0878
+--- /dev/null
++++ b/configs/am43xx_ocs_emmcboot_defconfig
+@@ -0,0 +1,10 @@
++CONFIG_ARM=y
++CONFIG_AM43XX=y
++CONFIG_TARGET_AM43XX_OCS=y
++CONFIG_SPL=y
++CONFIG_SYS_EXTRA_OPTIONS="SERIAL2,CONS_INDEX=2,SPL_ETH_SUPPORT,QSPI"
++# CONFIG_CMD_IMLS is not set
++# CONFIG_CMD_FLASH is not set
++# CONFIG_CMD_SETEXPR is not set
++CONFIG_SPI_FLASH_BAR=y
++CONFIG_SPI_FLASH=y
+\ No newline at end of file
+diff --git a/configs/am43xx_ocs_qspiboot_defconfig b/configs/am43xx_ocs_qspiboot_defconfig
+new file mode 100644
+index 0000000..5e20fff
+--- /dev/null
++++ b/configs/am43xx_ocs_qspiboot_defconfig
+@@ -0,0 +1,10 @@
++CONFIG_ARM=y
++CONFIG_AM43XX=y
++CONFIG_TARGET_AM43XX_OCS=y
++CONFIG_ISW_ENTRY_ADDR=0x30000000
++CONFIG_SYS_EXTRA_OPTIONS="SERIAL2,CONS_INDEX=2,QSPI,QSPI_BOOT"
++# CONFIG_CMD_IMLS is not set
++# CONFIG_CMD_FLASH is not set
++# CONFIG_CMD_SETEXPR is not set
++CONFIG_SPI_FLASH_BAR=y
++CONFIG_SPI_FLASH=y
+\ No newline at end of file
+diff --git a/include/configs/am43xx_ocs.h b/include/configs/am43xx_ocs.h
+new file mode 100644
+index 0000000..fcd906f
+--- /dev/null
++++ b/include/configs/am43xx_ocs.h
+@@ -0,0 +1,601 @@
++/*
++ * am43xx_evm.h
++ *
++ * Copyright (C) 2013 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * SPDX-License-Identifier:	GPL-2.0+
++ */
++
++#ifndef __CONFIG_AM43XX_OCS_H
++#define __CONFIG_AM43XX_OCS_H
++
++#define CONFIG_CMD_FAT
++
++#define CONFIG_BOARD_LATE_INIT
++#define CONFIG_ARCH_CPU_INIT
++#define CONFIG_SYS_CACHELINE_SIZE       32
++#define CONFIG_MAX_RAM_BANK_SIZE	(1024 << 20)	/* 1GB */
++#define CONFIG_SYS_TIMERBASE		0x48040000	/* Use Timer2 */
++
++#include <asm/arch/omap.h>
++
++/* NS16550 Configuration */
++#define CONFIG_SYS_NS16550
++#define CONFIG_SYS_NS16550_SERIAL
++#define CONFIG_SYS_NS16550_REG_SIZE	(-4)
++#define CONFIG_SYS_NS16550_CLK		48000000
++
++/* I2C Configuration */
++#define CONFIG_CMD_EEPROM
++#define CONFIG_ENV_EEPROM_IS_ON_I2C
++#define CONFIG_EEPROM_BUS_ADDRESS		0
++#define CONFIG_SYS_I2C_EEPROM_ADDR		0x50	/* Main EEPROM */
++#define CONFIG_SYS_I2C_EEPROM_ADDR_LEN	2
++#define CONFIG_SYS_I2C_MULTI_EEPROMS
++
++/* Power */
++#define CONFIG_POWER
++#define CONFIG_POWER_I2C
++#define CONFIG_POWER_TPS65218
++#define CONFIG_POWER_TPS62362
++
++/* SPL defines. */
++#define CONFIG_SPL_TEXT_BASE		CONFIG_ISW_ENTRY_ADDR
++#define CONFIG_SPL_MAX_SIZE			(NON_SECURE_SRAM_END - \
++										CONFIG_PUB_ROM_DATA_SIZE - \
++										CONFIG_SPL_TEXT_BASE)
++#define CONFIG_SYS_SPL_ARGS_ADDR	(CONFIG_SYS_SDRAM_BASE + \
++					 				(128 << 20))
++#define CONFIG_SPL_POWER_SUPPORT
++#define CONFIG_SPL_YMODEM_SUPPORT
++
++/* Enabling L2 Cache */
++#define CONFIG_SYS_L2_PL310
++#define CONFIG_SYS_PL310_BASE	0x48242000
++#define CONFIG_SYS_CACHELINE_SIZE	32
++
++/*
++ * Since SPL did pll and ddr initialization for us,
++ * we don't need to do it twice.
++ */
++#if !defined(CONFIG_SPL_BUILD) && !defined(CONFIG_QSPI_BOOT)
++#define CONFIG_SKIP_LOWLEVEL_INIT
++#endif
++
++/*
++ * When building U-Boot such that there is no previous loader
++ * we need to call board_early_init_f.  This is taken care of in
++ * s_init when we have SPL used.
++ */
++#if !defined(CONFIG_SKIP_LOWLEVEL_INIT) && !defined(CONFIG_SPL)
++#define CONFIG_BOARD_EARLY_INIT_F
++#endif
++
++/* Now bring in the rest of the common code. */
++#include <configs/ti_armv7_omap.h>
++
++/* Always 64 KiB env size */
++#define CONFIG_ENV_SIZE			(64 << 10)
++
++#define CONFIG_ENV_VARS_UBOOT_RUNTIME_CONFIG
++
++/* Clock Defines */
++#define V_OSCK					24000000  /* Clock output from T2 */
++#define V_SCLK					(V_OSCK)
++
++/* NS16550 Configuration */
++#define CONFIG_SYS_NS16550_COM2		0x48022000	/* UART1 */
++
++#define CONFIG_ENV_IS_IN_FAT
++#define FAT_ENV_INTERFACE		"mmc"
++#define FAT_ENV_DEVICE_AND_PART	"1:1"
++#define FAT_ENV_FILE			"uboot.env"
++#define CONFIG_FAT_WRITE
++
++#define CONFIG_SPL_LDSCRIPT		"$(CPUDIR)/omap-common/u-boot-spl.lds"
++
++#if !defined(CONFIG_SPL_BUILD)
++#define CONFIG_HW_WATCHDOG
++#define CONFIG_OMAP_WATCHDOG
++#endif
++
++#define CONFIG_EEPROM_OFFSET_MACIDHDR	0x500
++#define CONFIG_EEPROM_OFFSET_MACID1		0x502
++#define CONFIG_EEPROM_OFFSET_MACID2		0x508
++
++#if (defined(CONFIG_SPL_BUILD) && defined(CONFIG_SPL_USBETH_SUPPORT))
++#undef CONFIG_ENV_IS_IN_FAT
++#define CONFIG_ENV_IS_NOWHERE
++#endif
++
++#if defined(CONFIG_SPL_USBETH_SUPPORT) || defined(CONFIG_SPL_ETH_SUPPORT)
++#define CONFIG_SPL_NET_SUPPORT
++#endif
++
++
++#ifdef CONFIG_QSPI_BOOT
++#ifndef CONFIG_SYS_TEXT_BASE
++#define CONFIG_SYS_TEXT_BASE		CONFIG_ISW_ENTRY_ADDR
++#endif
++#undef CONFIG_ENV_IS_IN_FAT
++#define CONFIG_ENV_IS_IN_SPI_FLASH
++#define CONFIG_ENV_SPI_MAX_HZ           CONFIG_SF_DEFAULT_SPEED
++#define CONFIG_ENV_SECT_SIZE           (64 << 10) /* 64 KB sectors */
++#define CONFIG_ENV_OFFSET              0x100000
++/*#define CONFIG_SYS_REDUNDAND_ENVIRONMENT*/
++/*#define CONFIG_ENV_OFFSET_REDUND       0x120000*/
++#ifdef MTDIDS_DEFAULT
++#undef MTDIDS_DEFAULT
++#endif
++
++#ifdef MTDPARTS_DEFAULT
++#undef MTDPARTS_DEFAULT
++#endif
++#define MTDIDS_DEFAULT		"nor0=qspi-nor"
++#define MTDPARTS_DEFAULT	"qspi-nor:"\
++							"512k(qspi-nor.u-boot),"\
++							"512k(qspi-nor.u-boot-backup),"\
++							"64k(qspi-nor.u-boot-env),"\
++							"64k(qspi-nor.fdt),"\
++							"8m(qspi-nor.kernel-zImage),"\
++							"-(qspi-nor.file-system)"
++
++#define QSPINORARGS\
++	"mtdids=" MTDIDS_DEFAULT "\0" \
++	"mtdparts=" MTDPARTS_DEFAULT "\0" \
++	"qspi.fdtoffset=110000\0" \
++	"qspi.fdtsize=10000\0" \
++	"qspi.kerneloffset=120000\0" \
++	"qspi.kernelsize=800000\0" \
++	"qspiargs=setenv bootargs console=${console} " \
++		"${optargs} " \
++		"root=${qspiroot} " \
++		"rootfstype=${qspirootfstype}\0" \
++	"qspiroot=/dev/mtdblock5 rw\0"\
++	"qspirootfstype=jffs2 rootwait=1\0" \
++	"qspiboot=echo Booting from QSPI NOR...; " \
++		"run findfdt; " \
++		"run qspiargs; " \
++		"sf probe 0; " \
++		"sf read ${fdtaddr} ${qspi.fdtoffset} ${qspi.fdtsize}; " \
++		"sf read ${loadaddr} ${qspi.kerneloffset} ${qspi.kernelsize}; " \
++		"bootz ${loadaddr} - ${fdtaddr}\0"
++#else
++#define QSPINORARGS
++#endif
++
++#define CONFIG_IDENT_STRING    "-MS_OCS_RM_1.0.3.122"
++
++#if defined(CONFIG_SPL_USB_HOST_SUPPORT) || defined(CONFIG_SPL_USBETH_SUPPORT)
++
++/* SPL USB Support */
++#ifdef CONFIG_SPL_USB_HOST_SUPPORT
++#define CONFIG_SPL_USB_SUPPORT
++#endif
++
++#if defined(CONFIG_SPL_USB_HOST_SUPPORT) || !defined(CONFIG_SPL_BUILD)
++#define CONFIG_SYS_USB_FAT_BOOT_PARTITION		1
++#define CONFIG_CMD_USB
++#define CONFIG_USB_HOST
++#define CONFIG_USB_XHCI
++#define CONFIG_USB_XHCI_OMAP
++#define CONFIG_USB_STORAGE
++#define CONFIG_SYS_USB_XHCI_MAX_ROOT_PORTS 2
++
++#define CONFIG_OMAP_USB_PHY
++#define CONFIG_AM437X_USB2PHY2_HOST
++#endif
++
++/* USB GADGET */
++#if !defined(CONFIG_SPL_BUILD) || \
++	(defined(CONFIG_SPL_BUILD) && defined(CONFIG_SPL_USBETH_SUPPORT))
++#define CONFIG_USB_DWC3_PHY_OMAP
++#define CONFIG_USB_DWC3_OMAP
++#define CONFIG_USB_DWC3
++#define CONFIG_USB_DWC3_GADGET
++
++#define CONFIG_USB_GADGET
++#define CONFIG_USB_ETHER
++#define CONFIG_USB_ETH_RNDIS
++#define CONFIG_USBNET_HOST_ADDR "de:ad:be:af:00:00"
++#define CONFIG_USBDOWNLOAD_GADGET
++#define CONFIG_USB_GADGET_VBUS_DRAW 2
++#define CONFIG_G_DNL_MANUFACTURER "Texas Instruments"
++#define CONFIG_G_DNL_VENDOR_NUM 0x0403
++#define CONFIG_G_DNL_PRODUCT_NUM 0xBD00
++#define CONFIG_USB_GADGET_DUALSPEED
++#endif
++
++#ifndef CONFIG_SPL_BUILD
++/* USB Device Firmware Update support */
++#define CONFIG_DFU_FUNCTION
++#define CONFIG_DFU_RAM
++#define CONFIG_CMD_DFU
++
++#define CONFIG_DFU_MMC
++#define DFU_ALT_INFO_MMC \
++	"dfu_alt_info_mmc=" \
++	"boot part 0 1;" \
++	"rootfs part 0 2;" \
++	"MLO fat 0 1;" \
++	"spl-os-args fat 0 1;" \
++	"spl-os-image fat 0 1;" \
++	"u-boot.img fat 0 1;" \
++	"uEnv.txt fat 0 1\0"
++
++#define DFU_ALT_INFO_EMMC \
++	"dfu_alt_info_emmc=" \
++	"MLO raw 0x100 0x100 mmcpart 0;" \
++	"u-boot.img raw 0x300 0x1000 mmcpart 0\0"
++
++#define CONFIG_DFU_RAM
++#define DFU_ALT_INFO_RAM \
++	"dfu_alt_info_ram=" \
++	"kernel ram 0x80200000 0x4000000;" \
++	"fdt ram 0x80f80000 0x80000;" \
++	"ramdisk ram 0x81000000 0x4000000\0"
++
++#define CONFIG_DFU_SF
++#define DFU_ALT_INFO_QSPI \
++	"dfu_alt_info_qspi=" \
++	"u-boot.bin raw 0x0 0x080000;" \
++	"u-boot.backup raw 0x080000 0x080000;" \
++	"u-boot-spl-os raw 0x100000 0x010000;" \
++	"u-boot-env raw 0x110000 0x010000;" \
++	"u-boot-env.backup raw 0x120000 0x010000;" \
++	"kernel raw 0x130000 0x800000\0"
++
++#define DFUARGS \
++	"dfu_bufsiz=0x10000\0" \
++	DFU_ALT_INFO_MMC \
++	DFU_ALT_INFO_EMMC \
++	DFU_ALT_INFO_RAM \
++	DFU_ALT_INFO_QSPI
++#endif
++
++
++#define USBBOOTARGS \
++	"usbroot=/dev/sda2 rw\0" \
++	"usbrootfstype=ext4 rootwait\0" \
++	"usbdev=0\0" \
++	"usbargs=setenv bootargs console=${console} " \
++		"${optargs} " \
++		"root=${usbroot} " \
++		"rootfstype=${usbrootfstype}\0" \
++	"usbboot=" \
++		"setenv devnum ${usbdev}; " \
++		"setenv devtype usb; " \
++		"usb start ${usbdev}; " \
++		"if usb dev ${usbdev}; then " \
++			"if run loadbootenv; then " \
++				"echo Loaded environment from ${bootenv};" \
++				"run importbootenv;" \
++			"fi;" \
++			"if test -n $uenvcmd; then " \
++				"echo Running uenvcmd ...;" \
++				"run uenvcmd;" \
++			"fi;" \
++			"if run loadimage; then " \
++				"run loadfdt; " \
++				"echo Booting from usb ${usbdev}...; " \
++				"run usbargs;" \
++				"bootz ${loadaddr} - ${fdtaddr}; " \
++			"fi;" \
++		"fi\0" \
++		"fi;" \
++		"usb stop ${usbdev};\0" \
++#else
++#define USBBOOTARGS
++#define DFUARGS
++#endif
++
++/* SPI */
++#undef CONFIG_OMAP3_SPI
++#define CONFIG_TI_QSPI
++#define CONFIG_SPI_FLASH_MACRONIX
++#define CONFIG_CMD_SF
++#define CONFIG_CMD_SPI
++#define CONFIG_TI_SPI_MMAP
++#define CONFIG_QSPI_SEL_GPIO                   48
++#define CONFIG_SF_DEFAULT_SPEED                48000000
++#define CONFIG_SF_DEFAULT_MODE                 SPI_MODE_3
++#define CONFIG_QSPI_QUAD_SUPPORT
++
++#define CONFIG_TI_EDMA3
++
++/* Enhance our eMMC support / experience. */
++#define CONFIG_CMD_GPT
++#define CONFIG_EFI_PARTITION
++
++#ifndef CONFIG_SPL_BUILD
++/* CPSW Ethernet */
++#define CONFIG_CMD_DHCP
++#define CONFIG_CMD_PING
++#define CONFIG_CMD_MII
++#define CONFIG_MII
++#define CONFIG_BOOTP_DEFAULT
++#define CONFIG_BOOTP_DNS
++#define CONFIG_BOOTP_DNS2
++#define CONFIG_BOOTP_SEND_HOSTNAME
++#define CONFIG_BOOTP_GATEWAY
++#define CONFIG_BOOTP_SUBNETMASK
++#define CONFIG_NET_RETRY_COUNT		10
++#define CONFIG_PHY_GIGE
++#endif
++
++#define CONFIG_DRIVER_TI_CPSW
++#define CONFIG_PHYLIB
++#define PHY_ANEG_TIMEOUT	8000 /* PHY needs longer aneg time at 1G */
++
++#define CONFIG_SPL_ENV_SUPPORT
++#define CONFIG_SPL_NET_VCI_STRING	"AM43xx U-Boot SPL"
++
++#if defined(CONFIG_SPL_BUILD) && defined(CONFIG_SPL_ETH_SUPPORT)
++#undef CONFIG_ENV_IS_IN_FAT
++#define CONFIG_ENV_IS_NOWHERE
++#define CONFIG_SPL_NET_SUPPORT
++#endif
++
++#define CONFIG_SYS_RX_ETH_BUFFER	64
++
++/* Override the default boot delay */
++#ifdef CONFIG_BOOTDELAY
++#undef CONFIG_BOOTDELAY
++#define CONFIG_BOOTDELAY			3
++#endif
++#define CONFIG_CMD_BOOTMENU 
++#define CONFIG_MENU 
++#define CONFIG_AUTOBOOT_KEYED 
++#define CONFIG_MENU_SHOW
++
++/* NAND support */
++#ifdef CONFIG_NAND
++#error
++/* NAND: device related configs */
++#define CONFIG_SYS_NAND_PAGE_SIZE	4096
++#define CONFIG_SYS_NAND_OOBSIZE		224
++#define CONFIG_SYS_NAND_BLOCK_SIZE	(256*1024)
++#define CONFIG_SYS_NAND_PAGE_COUNT	(CONFIG_SYS_NAND_BLOCK_SIZE / \
++					 CONFIG_SYS_NAND_PAGE_SIZE)
++#define CONFIG_SYS_NAND_5_ADDR_CYCLE
++/* NAND: driver related configs */
++#define CONFIG_NAND_OMAP_GPMC
++#define CONFIG_NAND_OMAP_ELM
++#define CONFIG_SYS_NAND_ONFI_DETECTION
++#define CONFIG_NAND_OMAP_ECCSCHEME	OMAP_ECC_BCH16_CODE_HW
++#define CONFIG_SYS_NAND_BAD_BLOCK_POS	NAND_LARGE_BADBLOCK_POS
++#define CONFIG_SYS_NAND_ECCPOS	{ 2, 3, 4, 5, 6, 7, 8, 9, \
++				10, 11, 12, 13, 14, 15, 16, 17, 18, 19, \
++				20, 21, 22, 23, 24, 25, 26, 27, 28, 29, \
++				30, 31, 32, 33, 34, 35, 36, 37, 38, 39, \
++				40, 41, 42, 43, 44, 45, 46, 47, 48, 49, \
++				50, 51, 52, 53, 54, 55, 56, 57, 58, 59, \
++				60, 61, 62, 63, 64, 65, 66, 67, 68, 69, \
++				70, 71, 72, 73, 74, 75, 76, 77, 78, 79, \
++				80, 81, 82, 83, 84, 85, 86, 87, 88, 89, \
++				90, 91, 92, 93, 94, 95, 96, 97, 98, 99, \
++			100, 101, 102, 103, 104, 105, 106, 107, 108, 109, \
++			110, 111, 112, 113, 114, 115, 116, 117, 118, 119, \
++			120, 121, 122, 123, 124, 125, 126, 127, 128, 129, \
++			130, 131, 132, 133, 134, 135, 136, 137, 138, 139, \
++			140, 141, 142, 143, 144, 145, 146, 147, 148, 149, \
++			150, 151, 152, 153, 154, 155, 156, 157, 158, 159, \
++			160, 161, 162, 163, 164, 165, 166, 167, 168, 169, \
++			170, 171, 172, 173, 174, 175, 176, 177, 178, 179, \
++			180, 181, 182, 183, 184, 185, 186, 187, 188, 189, \
++			190, 191, 192, 193, 194, 195, 196, 197, 198, 199, \
++			200, 201, 202, 203, 204, 205, 206, 207, 208, 209, \
++			}
++#define CONFIG_SYS_NAND_ECCSIZE		512
++#define CONFIG_SYS_NAND_ECCBYTES	26
++#define MTDIDS_DEFAULT			"nand0=nand.0"
++#define MTDPARTS_DEFAULT		"mtdparts=nand.0:" \
++					"256k(NAND.SPL)," \
++					"256k(NAND.SPL.backup1)," \
++					"256k(NAND.SPL.backup2)," \
++					"256k(NAND.SPL.backup3)," \
++					"512k(NAND.u-boot-spl-os)," \
++					"1m(NAND.u-boot)," \
++					"256k(NAND.u-boot-env)," \
++					"256k(NAND.u-boot-env.backup1)," \
++					"7m(NAND.kernel)," \
++					"-(NAND.file-system)"
++#define CONFIG_SYS_NAND_U_BOOT_OFFS	0x00180000
++/* NAND: SPL related configs */
++#ifdef CONFIG_SPL_NAND_SUPPORT
++#define CONFIG_SPL_NAND_AM33XX_BCH
++#endif
++/* NAND: SPL falcon mode configs */
++#ifdef CONFIG_SPL_OS_BOOT
++#define CONFIG_CMD_SPL_NAND_OFS		0x00100000 /* os parameters */
++#define CONFIG_SYS_NAND_SPL_KERNEL_OFFS	0x00300000 /* kernel offset */
++#define CONFIG_CMD_SPL_WRITE_SIZE	CONFIG_SYS_NAND_BLOCK_SIZE
++#endif
++
++#define NANDARGS \
++	"mtdids=" MTDIDS_DEFAULT "\0" \
++	"mtdparts=" MTDPARTS_DEFAULT "\0" \
++	"nandargs=setenv bootargs console=${console} " \
++		"${optargs} " \
++		"root=${nandroot} " \
++		"rootfstype=${nandrootfstype}\0" \
++	"nandroot=ubi0:rootfs rw ubi.mtd=NAND.file-system,4096\0" \
++	"nandrootfstype=ubifs rootwait=1\0" \
++	"nandboot=echo Booting from nand ...; " \
++		"run nandargs; " \
++		"nand read ${fdtaddr} NAND.u-boot-spl-os; " \
++		"nand read ${loadaddr} NAND.kernel; " \
++		"bootz ${loadaddr} - ${fdtaddr}\0"
++
++#define NANDBOOT			"run nandboot; "
++#else /* !CONFIG_NAND */
++#define NANDARGS
++#define NANDBOOT
++#endif /* CONFIG_NAND */
++
++#ifndef CONFIG_SPL_BUILD
++#define M2010_MMC_ARGS\
++	"mmcdev=1\0" \
++	"mmcrootfstype=ext4 rootwait\0" \
++	"finduuid=part uuid mmc 1:2 uuid\0" \
++	"args_mmc=run finduuid;setenv bootargs console=${console} " \
++		"${optargs} " \
++		"root=PARTUUID=${uuid} rw " \
++		"rootfstype=${mmcrootfstype}\0" \
++	"loadbootscript=load mmc ${mmcdev} ${loadaddr} boot.scr\0" \
++	"bootscript=echo Running bootscript from mmc${mmcdev} ...; " \
++		"source ${loadaddr}\0" \
++	"bootenvfile=uboot.env\0" \
++	"bootpart=1:1\0" \
++	"bootdir=/boot\0" \
++	"loadimage=load ${devtype} ${bootpart} ${loadaddr} ${bootdir}/${bootfile}\0" \
++	"loadfdt=load ${devtype} ${bootpart} ${fdtaddr} ${bootdir}/${fdtfile}\0" \
++	"envboot=mmc dev ${mmcdev}; " \
++		"if mmc rescan; then " \
++			"echo SD/MMC found on device ${mmcdev};" \
++			"if run loadbootscript; then " \
++				"run bootscript;" \
++			"else " \
++				"if run loadbootenv; then " \
++					"echo Loaded env from ${bootenvfile};" \
++					"run importbootenv;" \
++				"fi;" \
++				"if test -n $uenvcmd; then " \
++					"echo Running uenvcmd ...;" \
++					"run uenvcmd;" \
++				"fi;" \
++			"fi;" \
++		"fi;\0" \
++	"mmcboot=mmc dev ${mmcdev}; " \
++		"setenv devnum ${mmcdev}; " \
++		"setenv devtype mmc; " \
++		"if mmc rescan; then " \
++			"echo SD/MMC found on device ${devnum};" \
++			"if run loadimage; then " \
++				"run loadfdt; " \
++				"echo Booting from mmc${mmcdev} ...; " \
++				"run args_mmc; " \
++				"bootz ${loadaddr} - ${fdtaddr}; " \
++			"fi;" \
++		"fi;\0" \
++
++
++#define CONFIG_EXTRA_ENV_SETTINGS \
++	DEFAULT_LINUX_BOOT_ENV \
++	NETARGS \
++	M2010_MMC_ARGS \
++	QSPINORARGS \
++	"autoload=no\0" \
++	"bootfile=zImage-initflasher.bin\0" \
++	"console=ttyO1,115200n8\0" \
++	"fdtfile=am437x-msocs.dtb\0" \
++	"findfdt="\
++		"if test $board_name = OCS_M2010_MB; then " \
++			"setenv fdtfile am437x-msocs.dtb; fi; " \
++		"if test $fdtfile = undefined; then " \
++			"echo WARNING: Could not determine device tree; fi; \0" \
++	"importbootenv=echo Importing environment from mmc${mmcdev} ...; " \
++		"env import -t ${loadaddr} ${filesize}\0" \
++	"loadbootenv=fatload mmc ${mmcdev} ${loadaddr} ${bootenvfile}\0" \
++	"loadfwupconf=if test ! -n ${PACKAGE_NAME}; then " \
++					"if fatload mmc ${mmcdev}:2 ${loadaddr} fwup.config; then " \
++						"env import -t $loadaddr $filesize; fi; fi;\0" \
++	"loadrollback=setenv PACKAGE_NAME rollback; setenv bootmedium EMMC; run updateoptargs; run mmcboot; \0" \
++	"loadfactoryos=setenv PACKAGE_NAME emmcprov; setenv bootmedium EMMC; run updateoptargs; run mmcboot; \0" \
++	"loadupgrade=setenv bootmedium EMMC;\0" \
++	"recoverqspi=sf probe; sf erase 0 90000; " \
++				"sf read $loadaddr 90000 70000; " \
++				"sf write $loadaddr 0 70000; "\
++				"reset; \0" \
++	"partitions=" \
++		"uuid_disk=${uuid_gpt_disk};" \
++		"name=rootfs,start=2MiB,size=-,uuid=${uuid_gpt_rootfs}\0" \
++	"ramroot=/dev/ram0 rw\0" \
++	"ramrootfstype=ext2\0" \
++	"ramargs=setenv bootargs console=${console} " \
++		"${optargs} " \
++		"root=${ramroot} " \
++		"rootfstype=${ramrootfstype}\0" \
++	"loadramdisk=load ${devtype} ${devnum} ${rdaddr} ramdisk.gz\0" \
++	"uartboot=loadb ${loadaddr}; loadb ${fdtaddr}; bootz ${loadaddr} - ${fdtaddr}; \0" \
++	"updateoptargs=setenv optargs bootmedium=${bootmedium} " \
++   								 "serverip=${serverip} " \
++  								 "msocsbootver=${msocsbootver} " \
++  								 "fwup=${PACKAGE_NAME}; \0" \
++	"msocsbootver=" CONFIG_IDENT_STRING "\0" \
++	BOOTMENU \
++	CONFIG_ENV_BOOTMEDIUM
++
++#endif
++
++#if defined(CONFIG_QSPI_BOOT)
++	#define CONFIG_ENV_BOOTMEDIUM	"bootmedium=QSPI\0"
++
++	#define CONFIG_BOOTCOMMAND \
++		"run loadfwupconf; " \
++		"if test -n ${UPGRADE_AUTOWDRB} && test ${UPGRADE_AUTOWDRB} = y; then " \
++			"if test $wdresetcount -ge 5; then " \
++				"run loadrollback; fi; fi; " \
++		"if test -n ${UPGRADE_STATUS}; then " \
++			"if test ${UPGRADE_STATUS} = active || test ${UPGRADE_STATUS} = pending; then " \
++				"run loadupgrade; " \
++				"setenv optargs " \
++					"bootmedium=${bootmedium} " \
++					"serverip=${serverip} " \
++					"msocsbootver=${msocsbootver} " \
++					"fwup=${PACKAGE_NAME}; " \
++				"echo Firmware upgrade operation will be performed using package: ${PACKAGE_NAME}; " \
++			"fi; " \
++		"else echo WARNING: This board is not setup to perform Firmware upgrades. Perform factory restore.; fi;" \
++		"run updateoptargs; " \
++		"if test ${UPGRADE_STATUS} != halt; then " \
++			"if test $bootmedium = QSPI; then " \
++				"run qspiboot; fi; " \
++			"if test $bootmedium = EMMC; then " \
++				"run mmcboot; fi; " \
++			"if test $bootmedium = UART; then " \
++				"run uartboot; fi; " \
++			"if test $bootmedium = NET; then " \
++				"run netboot; fi; " \
++		"else echo Too many failed upgrade attemps, halted; " \
++		"fi; " \
++
++	#define BOOTMENU \
++		"bootmenu_0=Run OS (QSPI NOR)=boot\0" \
++		"bootmenu_1=Rollback image=run loadrollback\0" \
++		"bootmenu_2=Restore factory image and settings=run loadfactoryos\0"
++
++#define CONFIG_MENU_NO_UBCONSOLE
++
++#else
++	#define CONFIG_ENV_BOOTMEDIUM	"bootmedium=EMMC\0"
++
++	#define CONFIG_BOOTCOMMAND \
++		"run loadfwupconf; " \
++		"setenv optargs " \
++			"bootmedium=${bootmedium} " \
++			"serverip=${serverip} " \
++			"msocsbootver=${msocsbootver} " \
++			"fwup=${PACKAGE_NAME}; " \
++		"if test ${UPGRADE_STATUS} != halt; then " \
++			"if test $bootmedium = QSPI; then " \
++				"run qspiboot; fi; " \
++			"if test $bootmedium = EMMC; then " \
++				"run mmcboot; fi; " \
++			"if test $bootmedium = UART; then " \
++				"run uartboot; fi; " \
++			"if test $bootmedium = NET; then " \
++				"run netboot; fi; " \
++		"else echo Too many failed upgrade attemps, halted; " \
++		"fi; " \
++
++	#define BOOTMENU \
++		"bootmenu_0=Run upgrade/recovery (EMMC)=boot\0" \
++		"bootmenu_1=Rollback image=run loadrollback\0" \
++		"bootmenu_2=Restore factory image and settings=run loadfactoryos\0" \
++		"bootmenu_3=Recover QSPI Uboot=run recoverqspi\0"
++		
++#endif
++
++#endif	/* __CONFIG_AM43XX_EVM_H */
++
+diff --git a/include/configs/ti_armv7_common.h b/include/configs/ti_armv7_common.h
+index d4b1d83..7bc0a25 100644
+--- a/include/configs/ti_armv7_common.h
++++ b/include/configs/ti_armv7_common.h
+@@ -59,9 +59,9 @@
+ 	"bootm_size=0x10000000\0"
+ 
+ #define DEFAULT_MMC_TI_ARGS \
+-	"mmcdev=0\0" \
++	"mmcdev=1\0" \
+ 	"mmcrootfstype=ext4 rootwait\0" \
+-	"finduuid=part uuid mmc 0:2 uuid\0" \
++	"finduuid=part uuid mmc 1:2 uuid\0" \
+ 	"args_mmc=run finduuid;setenv bootargs console=${console} " \
+ 		"${optargs} " \
+ 		"root=PARTUUID=${uuid} rw " \
+@@ -296,7 +296,7 @@
+ #define NETARGS \
+ 	"static_ip=${ipaddr}:${serverip}:${gatewayip}:${netmask}:${hostname}" \
+ 		"::off\0" \
+-	"nfsopts=nolock\0" \
++	"nfsopts=nolock,v3,tcp,rsize=4096,wsize=4096\0" \
+ 	"rootpath=/export/rootfs\0" \
+ 	"netloadimage=tftp ${loadaddr} ${bootfile}\0" \
+ 	"netloadfdt=tftp ${fdtaddr} ${fdtfile}\0" \
+@@ -307,7 +307,6 @@
+ 		"ip=dhcp\0" \
+ 	"netboot=echo Booting from network ...; " \
+ 		"setenv autoload no; " \
+-		"dhcp; " \
+ 		"run netloadimage; " \
+ 		"run netloadfdt; " \
+ 		"run netargs; " \
+diff --git a/include/configs/ti_armv7_omap.h b/include/configs/ti_armv7_omap.h
+old mode 100644
+new mode 100755
+diff --git a/include/version.h b/include/version.h
+index 777e9f6..1d9bb8a 100644
+--- a/include/version.h
++++ b/include/version.h
+@@ -18,8 +18,7 @@
+ #define CONFIG_IDENT_STRING ""
+ #endif
+ 
+-#define U_BOOT_VERSION_STRING U_BOOT_VERSION " (" U_BOOT_DATE " - " \
+-	U_BOOT_TIME " " U_BOOT_TZ ")" CONFIG_IDENT_STRING
++#define U_BOOT_VERSION_STRING U_BOOT_VERSION CONFIG_IDENT_STRING
+ 
+ #ifndef __ASSEMBLY__
+ extern const char version_string[];

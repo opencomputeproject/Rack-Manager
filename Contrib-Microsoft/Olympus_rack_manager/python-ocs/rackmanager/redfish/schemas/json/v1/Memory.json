@@ -1,0 +1,24 @@
+{
+    "$schema": "http://redfish.dmtf.org/schemas/v1/redfish-schema.v1_1_0.json",
+    "title": "#Memory.Memory",
+    "$ref": "#/definitions/Memory",
+    "definitions": {
+        "Memory": {
+            "anyOf": [
+                {
+                    "$ref": "http://redfish.dmtf.org/schemas/v1/odata.4.0.0.json#/definitions/idRef"
+                },
+                {
+                    "$ref": "http://redfish.dmtf.org/schemas/v1/Memory.v1_0_0.json#/definitions/Memory"
+                },
+                {
+                    "$ref": "http://redfish.dmtf.org/schemas/v1/Memory.v1_0_1.json#/definitions/Memory"
+                },
+                {
+                    "$ref": "http://redfish.dmtf.org/schemas/v1/Memory.v1_1_0.json#/definitions/Memory"
+                }
+            ]
+        }
+    },
+    "copyright": "Copyright 2014-2016 Distributed Management Task Force, Inc. (DMTF). For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright"
+}

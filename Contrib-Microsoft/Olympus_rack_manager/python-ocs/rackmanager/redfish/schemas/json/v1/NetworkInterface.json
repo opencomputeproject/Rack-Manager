@@ -1,0 +1,18 @@
+{
+    "$schema": "http://redfish.dmtf.org/schemas/v1/redfish-schema.v1_1_0.json",
+    "title": "#NetworkInterface.NetworkInterface",
+    "$ref": "#/definitions/NetworkInterface",
+    "definitions": {
+        "NetworkInterface": {
+            "anyOf": [
+                {
+                    "$ref": "http://redfish.dmtf.org/schemas/v1/odata.4.0.0.json#/definitions/idRef"
+                },
+                {
+                    "$ref": "http://redfish.dmtf.org/schemas/v1/NetworkInterface.v1_0_0.json#/definitions/NetworkInterface"
+                }
+            ]
+        }
+    },
+    "copyright": "Copyright 2014-2016 Distributed Management Task Force, Inc. (DMTF). For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright"
+}

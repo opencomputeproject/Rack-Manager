@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<edmx:Edmx xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx" Version="4.0">
+
+  <edmx:Reference Uri="http://docs.oasis-open.org/odata/odata/v4.0/cs01/vocabularies/Org.OData.Core.V1.xml">
+    <edmx:Include Namespace="Org.OData.Core.V1" Alias="OData"/>
+  </edmx:Reference>
+  <edmx:Reference Uri="schemas/xml/v1/RedfishExtensions_v1.xml">
+    <edmx:Include Namespace="RedfishExtensions.v1_0_0" Alias="Redfish"/>
+  </edmx:Reference>
+  <edmx:Reference Uri="schemas/xml/v1/Resource_v1.xml">
+    <edmx:Include Namespace="Resource"/>
+    <edmx:Include Namespace="Resource.v1_0_0" />
+    <edmx:Include Namespace="Resource.v1_1_0" />
+  </edmx:Reference>
+
+  <edmx:DataServices>
+  
+    <Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="OcsPowerMeter">
+    
+      <EntityType Name="PowerMeter" BaseType="Resource.v1_0_0.Resource" Abstract="true">
+        <Annotation Term="OData.Description" String="This is a monitor for rack power."/>
+        <Annotation Term="OData.LongDescription" String="This is a monitor for rack power."/>
+      </EntityType>
+      
+      <Action Name="ClearMaxPower" IsBound="true">
+        <Parameter Name="PowerMeter" Type="Ocs.v1_0_0.Actions"/>
+        <Annotation Term="OData.Description" String="This action will clear the peak power detected by the power monitor."/>
+        <Annotation Term="OData.LongDescription" String="This action will clear the peak power detected by the power monitor."/>
+      </Action>
+      
+      <Action Name="ClearFaults" IsBound="true">
+        <Parameter Name="PowerMeter" Type="Ocs.v1_0_0.Actions"/>
+        <Annotation Term="OData.Description" String="This action will clear any faults detected by the power monitor."/>
+        <Annotation Term="OData.LongDescription" String="This action will clear any faults detected by the power monitor."/>
+      </Action>
+    
+    </Schema>
+    
+    <Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="OcsPowerMeter.v1_0_0">
+      
+      <EntityType Name="PowerMeter" BaseType="OcsPowerMeter.PowerMeter">
+        <Property Name="FirmwareVersion" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The firmware version of the power meter."/>
+          <Annotation Term="OData.LongDescription" String="The firmware version of the power meter."/>
+        </Property>
+        <Property Name="DatacenterThrottleEnabled" Type="Edm.Boolean">
+          <Annotation Term="OData.Description" String="Indication if the power meter is configured to accept the datacenter throttle signal."/>
+          <Annotation Term="OData.LongDescription" String="Indication if the power meter is configured to accept the datacenter throttle signal."/>
+        </Property>
+        <Property Name="DatacenterThrottleActive" Type="Edm.Boolean">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="Indication if the datacenter throttle signal is active."/>
+          <Annotation Term="OData.LongDescription" String="Indication if the datacenter throttle signal is active."/>
+        </Property>
+        <Property Name="AlertLimitWatts" Type="Edm.Decimal">
+          <Annotation Term="OData.Description" String="The power at which the power meter will trigger an alert."/>
+          <Annotation Term="OData.LongDescription" String="The power at which the power meter will trigger an alert."/>
+        </Property>
+        <Property Name="AlertEnabled" Type="Edm.Boolean">
+          <Annotation Term="OData.Description" String="Indication if the power usage alert is enabled."/>
+          <Annotation Term="OData.LongDescription" String="Indication if the power usage alert is enabled."/>
+        </Property>
+        <Property Name="AlertActive" Type="Edm.Boolean">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="Indication if the power usage alert is active."/>
+          <Annotation Term="OData.LongDescription" String="Indication if the power usage alert is active."/>
+        </Property>
+        <Property Name="MaxPowerWatts" Type="Edm.Decimal">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The maximum power usage detected."/>
+          <Annotation Term="OData.LongDescription" String="The maximum power usage detected."/>
+        </Property>
+        <Property Name="PowerDrawnWatts" Type="Edm.Decimal">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The current power usage."/>
+          <Annotation Term="OData.LongDescription" String="The current power usage."/>
+        </Property>
+        <Property Name="Feed1" Type="OcsPowerMeter.v1_0_0.Feed">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The status of power feed 1."/>
+          <Annotation Term="OData.LongDescription" String="The status of power feed 1."/>
+        </Property>
+        <Property Name="Feed2" Type="OcsPowerMeter.v1_0_0.Feed">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The status of power feed 2."/>
+          <Annotation Term="OData.LongDescription" String="The status of power feed 2."/>
+        </Property>
+        <Property Name="Actions" Type="OcsPowerMeter.v1_0_0.Actions" Nullable="false">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The available actions for this resource."/>
+          <Annotation Term="OData.LongDescription" String="The Actions property shall contain the available actions for this resource."/>
+        </Property>
+      </EntityType>
+      
+      <ComplexType Name="Feed">
+        <Annotation Term="OData.AdditionalProperties" Bool="false"/>
+        <Property Name="Phase1PowerWatts" Type="Edm.Decimal">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The power drawn by phase 1."/>
+          <Annotation Term="OData.LongDescription" String="The power drawn by phase 1."/>
+        </Property>
+        <Property Name="Phase2PowerWatts" Type="Edm.Decimal">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The power drawn by phase 2."/>
+          <Annotation Term="OData.LongDescription" String="The power drawn by phase 2."/>
+        </Property>
+        <Property Name="Phase3PowerWatts" Type="Edm.Decimal">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The power drawn by phase 3"/>
+          <Annotation Term="OData.LongDescription" String="The power drawn by phase 3."/>
+        </Property>
+        <Property Name="Faults" Type="Edm.Decimal">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The faults detected on the feed."/>
+          <Annotation Term="OData.LongDescription" String="The faults detected on the feed."/>
+        </Property>
+      </ComplexType>
+      
+      <ComplexType Name="Actions">
+        <Annotation Term="OData.AdditionalProperties" Bool="false"/>
+        <Property Name="Oem" Type="OcsPowerMeter.v1_0_0.OemActions" Nullable="false"/>
+      </ComplexType>
+
+      <ComplexType Name="OemActions">
+        <Annotation Term="OData.AdditionalProperties" Bool="true"/>
+      </ComplexType>
+      
+    </Schema>
+
+  </edmx:DataServices>
+</edmx:Edmx>

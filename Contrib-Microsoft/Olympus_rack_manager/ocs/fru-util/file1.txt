@@ -1,0 +1,18 @@
+Board_MfgTime:2016-7-7 16:45:21
+Board_MfgName:his is Manufacture
+Board_Product: This is Product
+Board_Serial: This is Serial
+Board_PartNumber: This is Part Number
+Board_FruId: 123
+Board_BinaryAdd:01-01-01-01-01-01:01:01
+Board_BinaryAdd:00:00:00:00:00:00:00:00
+Board_Version: This is Custom 2
+Board_Build: This is Custom 3
+Product_Mfgr: This is Manufacture
+Product_Product: This is Product
+Product_Model: This is Model
+Product_Serial: This is Serial
+Product_AssetTag: This is AssetTag
+Product_FruId: This is Custom 1
+Product_SubProd: This is Custom 2
+Product_Build: This is Custom 3

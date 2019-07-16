@@ -1,0 +1,380 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<edmx:Edmx xmlns:edmx="http://docs.oasis-open.org/odata/ns/edmx" Version="4.0">
+
+  <edmx:Reference Uri="http://docs.oasis-open.org/odata/odata/v4.0/cs01/vocabularies/Org.OData.Core.V1.xml">
+    <edmx:Include Namespace="Org.OData.Core.V1" Alias="OData"/>
+  </edmx:Reference>
+  <edmx:Reference Uri="schemas/xml/v1/RedfishExtensions_v1.xml">
+    <edmx:Include Namespace="RedfishExtensions.v1_0_0" Alias="Redfish"/>
+  </edmx:Reference>
+  <edmx:Reference Uri="schemas/xml/v1/Resource_v1.xml">
+    <edmx:Include Namespace="Resource"/>
+    <edmx:Include Namespace="Resource.v1_0_0" />
+    <edmx:Include Namespace="Resource.v1_1_0" />
+  </edmx:Reference>
+
+  <edmx:DataServices>
+  
+    <Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="OcsPower">
+    
+      <EntityType Name="PowerPorts" BaseType="Resource.v1_0_0.Resource" Abstract="true">
+        <Annotation Term="OData.Description" String="This is a set of ports that controls power to components."/>
+        <Annotation Term="OData.LongDescription" String="This is a set of ports that controls power to components."/>
+      </EntityType>
+      
+      <EntityType Name="PowerPort" BaseType="Resource.v1_0_0.Resource" Abstract="true">
+        <Annotation Term="OData.Description" String="This is a single port that controls power to a component."/>
+        <Annotation Term="OData.LongDescription" String="This is a single port that controls power to a component."/>
+      </EntityType>
+      
+      <ComplexType Name="PowerLimit" Abstract="true">
+        <Annotation Term="OData.Description" String="This defines OCS power limitting capababilies beyond standard Redfish power limits."/>
+        <Annotation Term="OData.LongDescription" String="This defines OCS power limitting capababilies beyond standard Redfish power limits."/>
+        <Annotation Term="OData.AdditionalProperties" Bool="false"/>
+      </ComplexType>
+      
+      <ComplexType Name="PowerSupply" Abstract="true">
+        <Annotation Term="OData.Description" String="This defines OCS extensions to standard Redfish power supplies."/>
+        <Annotation Term="OData.LongDescription" String="This defines OCS extensions to standard Redfish power supplies."/>
+        <Annotation Term="OData.AdditionalProperties" Bool="false"/>
+      </ComplexType>
+      
+      <ComplexType Name="Status" Abstract="true">
+        <Annotation Term="OData.Description" String="This defines OCS extensions to the Redfish Status object."/>
+        <Annotation Term="OData.LongDescription" String="This defines OCS extensions to the Redfish Status object."/>
+        <Annotation Term="OData.AdditionalProperties" Bool="false"/>
+      </ComplexType>
+      
+      <Action Name="RearmTrigger" IsBound="true">
+        <Parameter Name="PowerLimit" Type="OcsPower.v1_0_0.Actions"/>
+        <Parameter Name="RearmType" Type="OcsPower.RearmType">
+          <Annotation Term="OData.Description" String="This is the action to take while rearming the power limit trigger."/>
+          <Annotation Term="OData.LongDescription" String="This is the action to take while rearming the power limit trigger."/>
+        </Parameter>
+        <Annotation Term="OData.Description" String="This action will rearm the system trigger looking for throttle events."/>
+        <Annotation Term="OData.LongDescription" String="This action will rearm the system trigger looking for throttle events."/>
+      </Action>
+      
+      <Action Name="Activate" IsBound="true">
+        <Parameter Name="PowerLimit" Type="OcsPower.v1_0_0.Actions"/>
+        <Annotation Term="OData.Description" String="This action will activate the static power limit for the system."/>
+        <Annotation Term="OData.LongDescription" String="This action will activate the static power limit for the system."/>
+      </Action>
+      
+      <Action Name="Deactivate" IsBound="true">
+        <Parameter Name="PowerLimit" Type="OcsPower.v1_0_0.Actions"/>
+        <Annotation Term="OData.Description" String="This action will deactivate the static power limit for the system."/>
+        <Annotation Term="OData.LongDescription" String="This action will deactivate the static power limit for the system."/>
+      </Action>
+      
+      <Action Name="BatteryTest" IsBound="true">
+        <Parameter Name="PowerSupply" Type="OcsPower.v1_0_0.Actions"/>
+        <Annotation Term="OData.Description" String="This action will start an internal test of the power supply battery."/>
+        <Annotation Term="OData.LongDescription" String="This action will start an internal test of the power supply battery."/>
+      </Action>
+      
+      <Action Name="BatteryTest" IsBound="true">
+        <Parameter Name="PowerSupply" Type="OcsPower.v1_0_0.Actions"/>
+        <Annotation Term="OData.Description" String="This action will start an internal test of the power supply battery."/>
+        <Annotation Term="OData.LongDescription" String="This action will start an internal test of the power supply battery."/>
+      </Action>
+      
+      <Action Name="ClearFaults" IsBound="true">
+        <Parameter Name="PowerSupply" Type="OcsPower.v1_0_0.Actions"/>
+        <Annotation Term="OData.Description" String="This action will clear any faults reported by the power supply."/>
+        <Annotation Term="OData.LongDescription" String="This action will clear any faults reported by the power supply."/>
+      </Action>
+      
+      <Action Name="FirmwareUpdate" IsBound="true">
+        <Parameter Name="PowerSupply" Type="OcsPower.v1_0_0.Actions"/>
+        <Parameter Name="File" Type="Edm.String">
+          <Annotation Term="OData.Description" String="The path to the firmware file that should be used for the update."/>
+          <Annotation Term="OData.LongDescription" String="The path to the firmware file that should be used for the update."/>
+        </Parameter>
+        <Parameter Name="FWRegion" Type="OcsPower.FWRegion">
+          <Annotation Term="OData.Description" String="The firmware image type that should be updated."/>
+          <Annotation Term="OData.LongDescription" String="The firmware image type that should be updated."/>
+        </Parameter>
+        <Annotation Term="OData.Description" String="This action will start the firmware update process for the power supply."/>
+        <Annotation Term="OData.LongDescription" String="This action will start the firmware update process for the power supply."/>
+      </Action>
+      
+      <Action Name="FirmwareUpdateState" IsBound="true">
+        <Parameter Name="PowerSupply" Type="OcsPower.v1_0_0.Actions"/>
+        <Parameter Name="Operation" Type="OcsPower.Operation">
+          <Annotation Term="OData.Description" String="The type of state operation to perform on the firmware update."/>
+          <Annotation Term="OData.LongDescription" String="The type of state operation to perform on the firmware update."/>
+        </Parameter>
+        <Annotation Term="OData.Description" String="This action will query firmware update state or stop the upgrade."/>
+        <Annotation Term="OData.LongDescription" String="This action will query firmware update state or stop the upgrade."/>
+      </Action>
+      
+      <EnumType Name="RearmType">
+        <Member Name="DeactivatePowerLimit">
+          <Annotation Term="OData.Description" String="Deactivate the dynamic power limit and rearm."/>
+        </Member>
+        <Member Name="RearmOnly">
+          <Annotation Term="OData.Description" String="Leave the dynamic power limit active and rearm."/>
+        </Member>
+      </EnumType>
+      
+      <EnumType Name="FWRegion">
+        <Member Name="A">
+          <Annotation Term="OData.Description" String="Firmware region A."/>
+        </Member>
+        <Member Name="B">
+          <Annotation Term="OData.Description" String="Firmware region B."/>
+        </Member>
+        <Member Name="Bootloader">
+          <Annotation Term="OData.Description" String="Bootloader firmware."/>
+        </Member>
+      </EnumType>
+      
+      <EnumType Name="Operation">
+        <Member Name="Abort">
+          <Annotation Term="OData.Description" String="Abort the firmware update process."/>
+        </Member>
+        <Member Name="Query">
+          <Annotation Term="OData.Description" String="Query the firmware update progress."/>
+        </Member>
+      </EnumType>
+    
+    </Schema>
+    
+    <Schema xmlns="http://docs.oasis-open.org/odata/ns/edm" Namespace="OcsPower.v1_0_0">
+      
+      <EntityType Name="PowerPorts" BaseType="OcsPower.PowerPorts">
+        <NavigationProperty Name="PDU" Type="Collection(OcsPower.v1_0_0.PowerPort)" Nullable="false">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/ReadWrite"/>
+          <Annotation Term="OData.Description" String="This is the list of ports available on the power distribution unit."/>
+          <Annotation Term="OData.LongDescription" String="This is the list of ports available on the power distribution unit."/>
+          <Annotation Term="OData.AutoExpand"/>
+        </NavigationProperty>
+        <NavigationProperty Name="Relays" Type="Collection(OcsPower.v1_0_0.PowerPort)" Nullable="false">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/ReadWrite"/>
+          <Annotation Term="OData.Description" String="This is the list of ports available for controlling AC socket relays."/>
+          <Annotation Term="OData.LongDescription" String="This is the list of ports available for controlling AC socket relays."/>
+          <Annotation Term="OData.AutoExpand"/>
+        </NavigationProperty>
+        <NavigationProperty Name="RackManagers" Type="Collection(OcsPower.v1_0_0.PowerPort)" Nullable="false">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/ReadWrite"/>
+          <Annotation Term="OData.Description" String="This is the list of ports available for controlling external rack managers."/>
+          <Annotation Term="OData.LongDescription" String="This is the list of ports available for controlling external rack managers."/>
+          <Annotation Term="OData.AutoExpand"/>
+        </NavigationProperty>
+      </EntityType>
+      
+      <EntityType Name="PowerPort" BaseType="OcsPower.PowerPort">
+        <Property Name="PowerPortType" Type="PowerPort.v1_0_0.PowerPortType" Nullable="false">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The type of power port represented by this resource."/>
+          <Annotation Term="OData.LongDescription" String="The type of power port represented by this resource."/>
+        </Property>
+        <Property Name="Presence" Type="Edm.Boolean">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="Indication if the component connected to the port is present."/>
+          <Annotation Term="OData.LongDescription" String="Indication if the component connected to the port is present."/>
+        </Property>
+        <Property Name="PowerState" Type="PowerPort.v1_0_0.PowerState">
+          <Annotation Term="OData.Description" String="This is the current power state of the port."/>
+          <Annotation Term="OData.LongDescription" String="This is the current power state of the port."/>
+        </Property>
+        <Property Name="BootStrapping" Type="PowerPort.v1_0_0.BootStrap">
+          <Annotation Term="OData.Description" String="This is the current boot strapping option for the port."/>
+          <Annotation Term="OData.LongDescription" String="This is the current boot strapping option for the port."/>
+        </Property>
+      </EntityType>
+      
+      <EnumType Name="PowerPortType">
+        <Member Name="PDU">
+          <Annotation Term="OData.Description" String="A Power Distribution Unit"/>
+        </Member>
+        <Member Name="Relay">
+          <Annotation Term="OData.Description" String="An AC socket relay"/>
+        </Member>
+        <Member Name="RackManager">
+          <Annotation Term="OData.Description" String="An external rack manager"/>
+        </Member>
+      </EnumType>     
+
+      <EnumType Name="PowerState">
+        <Member Name="On">
+          <Annotation Term="OData.Description" String="The port is powered on."/>
+        </Member>
+        <Member Name="Off">
+          <Annotation Term="OData.Description" String="The port is powered off."/>
+        </Member>
+      </EnumType>
+      
+      <EnumType Name="BootStrap">
+        <Member Name="Normal">
+          <Annotation Term="OData.Description" String="The system will boot normally."/>
+        </Member>
+        <Member Name="Network">
+          <Annotation Term="OData.Description" String="The system will boot over the network."/>
+        </Member>
+      </EnumType>
+      
+      <ComplexType Name="PowerLimit" BaseType="OcsPower.PowerLimit">
+        <Property Name="DefaultLimitInWatts" Type="Edm.Decimal">
+          <Annotation Term="OData.Description" String="The dynamic power limit to be applied when configured to do so."/>
+          <Annotation Term="OData.LongDescription" String="The dynamic power limit to be applied when configured to do so."/>
+        </Property>
+        <Property Name="AutoRemoveDelayInSec" Type="Edm.Decimal">
+          <Annotation Term="OData.Description" String="The number of seconds before the default power limit is automatically removed."/>
+          <Annotation Term="OData.LongDescription" String="The number of seconds before the default power limit is automatically removed."/>
+        </Property>
+        <Property Name="FastThrottleDurationInMs" Type="Edm.Decimal">
+          <Annotation Term="OData.Description" String="The amount of time to wait before applying the default power limit when signaled."/>
+          <Annotation Term="OData.LongDescription" String="The amount of time to wait before applying the default power limit when signaled."/>
+        </Property>
+        <Property Name="AlertAction" Type="OcsPower.v1_0_0.AlertAction">
+          <Annotation Term="OData.Description" String="The action to take regarding the default power limit when signaled."/>
+          <Annotation Term="OData.LongDescription" String="The action to take regarding the default power limit when signaled."/>
+        </Property>
+        <Property Name="RackThrottleEnabled" Type="Edm.Boolean">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="Indication if the rack throttle signal can automatically throttle the system."/>
+          <Annotation Term="OData.LongDescription" String="Indication if the rack throttle signal can automatically throttle the system."/>
+        </Property>
+        <Property Name="AlertActive" Type="Edm.Boolean">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="Indication if the rack throttle signal is active."/>
+          <Annotation Term="OData.LongDescription" String="Indication if the rack throttle signal is active."/>
+        </Property>
+        <Property Name="BmcForceThrottleActive" Type="Edm.Boolean">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="Indication if the BMC is throttle signal is active."/>
+          <Annotation Term="OData.LongDescription" String="Indication if the BMC is throttle signal is active."/>
+        </Property>
+        <Property Name="Actions" Type="OcsPower.v1_0_0.Actions" Nullable="false">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The available actions for this resource."/>
+          <Annotation Term="OData.LongDescription" String="The Actions property shall contain the available actions for this resource."/>
+        </Property>
+      </ComplexType>
+      
+      <EnumType Name="AlertAction">
+        <Member Name="NoAction">
+          <Annotation Term="OData.Description" String="Take no action on throttle signals."/>
+        </Member>
+        <Member Name="ThrottleAndLimit">
+          <Annotation Term="OData.Description" String="Throttle the system and apply the default power limit."/>
+        </Member>
+        <Member Name="PowerLimitOnly">
+          <Annotation Term="OData.Description" String="Only apply the default power limit."/>
+        </Member>
+      </EnumType>
+      
+      <ComplexType Name="PowerSupply" BaseType="OcsPower.PowerSupply">
+        <Property Name="PowerInputWatts" Type="Edm.Decimal">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The input power to the supply."/>
+          <Annotation Term="OData.LongDescription" String="The input power to the supply."/>
+        </Property>
+        <Property Name="PsuFeed" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The active power feed into the supply."/>
+          <Annotation Term="OData.LongDescription" String="The active power feed into the supply."/>
+        </Property>
+        <Property Name="BootloaderVersion" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The bootloader version of the power supply."/>
+          <Annotation Term="OData.LongDescription" String="The bootloader version of the power supply."/>
+        </Property>
+        <Property Name="Battery" Type="OcsPower.v1_0_0.Battery">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The status of the battery attached to the power supply."/>
+          <Annotation Term="OData.LongDescription" String="The status of the battery attached to the power supply."/>
+        </Property>
+        <Property Name="Actions" Type="OcsPower.v1_0_0.Actions" Nullable="false">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The available actions for this resource."/>
+          <Annotation Term="OData.LongDescription" String="The Actions property shall contain the available actions for this resource."/>
+        </Property>
+      </ComplexType>
+      
+      <ComplexType Name="Battery">
+        <Annotation Term="OData.AdditionalProperties" Bool="false"/>
+        <Property Name="Balancing" Type="Edm.Boolean">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="Indication that cells are being balanced."/>
+          <Annotation Term="OData.LongDescription" String="Indication that cells are being balanced."/>
+        </Property>
+        <Property Name="ExternalPower" Type="Edm.Boolean">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="Indication that battery management is running on external power."/>
+          <Annotation Term="OData.LongDescription" String="Indication that battery management is running on external power."/>
+        </Property>
+        <Property Name="PreChargeActive" Type="Edm.Boolean">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="Indication that battery cell voltage conditions are below normal charging limits."/>
+          <Annotation Term="OData.LongDescription" String="Indication that battery cell voltage conditions are below normal charging limits."/>
+        </Property>
+        <Property Name="DischargeAllowed" Type="Edm.Boolean">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="Indication that battery conditions are normal and discharging is allowed."/>
+          <Annotation Term="OData.LongDescription" String="Indication that battery conditions are normal and discharging is allowed."/>
+        </Property>
+        <Property Name="ChargeAllowed" Type="Edm.Boolean">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="Indication that battery conditions are normal and charging is allowed."/>
+          <Annotation Term="OData.LongDescription" String="Indication that battery conditions are normal and charging is allowed."/>
+        </Property>
+        <Property Name="Charging" Type="Edm.Boolean">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="Indication that charge current is detected."/>
+          <Annotation Term="OData.LongDescription" String="Indication that charge current is detected."/>
+        </Property>
+        <Property Name="Discharging" Type="Edm.Boolean">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="Indication that discharge current is detected."/>
+          <Annotation Term="OData.LongDescription" String="Indication that discharge current is detected."/>
+        </Property>
+        <Property Name="Initialized" Type="Edm.Boolean">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="Indication that the battery has been initialized."/>
+          <Annotation Term="OData.LongDescription" String="Indication that the battery has been initialized."/>
+        </Property>
+      </ComplexType>
+      
+      <ComplexType Name="Status" BaseType="OcsPower.Status">
+        <Property Name="PsuA" Type="OcsPower.v1_0_0.PsuStatus">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="Status of PSU feed A."/>
+          <Annotation Term="OData.LongDescription" String="Status of PSU feed A."/>
+        </Property>
+        <Property Name="PsuB" Type="OcsPower.v1_0_0.PsuStatus">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="Status of PSU feed B."/>
+          <Annotation Term="OData.LongDescription" String="Status of PSU feed B."/>
+        </Property>
+        <Property Name="Faults" Type="Edm.String">
+          <Annotation Term="OData.Permissions" EnumMember="OData.Permission/Read"/>
+          <Annotation Term="OData.Description" String="The list of faults detected on the power supply."/>
+          <Annotation Term="OData.LongDescription" String="The list of faults detected on the power supply."/>
+        </Property>
+      </ComplexType>
+      
+      <EnumType Name="PsuStatus">
+        <Member Name="Healthy">
+          <Annotation Term="OData.Description" String="The PSU is healthy."/>
+        </Member>
+        <Member Name="Faulty">
+          <Annotation Term="OData.Description" String="The PSU is faulty."/>
+        </Member>
+      </EnumType>
+      
+      <ComplexType Name="Actions">
+        <Annotation Term="OData.AdditionalProperties" Bool="false"/>
+        <Property Name="Oem" Type="OcsPower.v1_0_0.OemActions" Nullable="false"/>
+      </ComplexType>
+
+      <ComplexType Name="OemActions">
+        <Annotation Term="OData.AdditionalProperties" Bool="true"/>
+      </ComplexType>
+      
+    </Schema>
+
+  </edmx:DataServices>
+</edmx:Edmx>

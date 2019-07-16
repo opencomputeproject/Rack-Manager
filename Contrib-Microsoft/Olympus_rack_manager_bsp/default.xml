@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+
+  <default sync-j="4" revision="fido"/>
+
+  <remote fetch="https://git.yoctoproject.org/git" name="yocto"/>
+  <remote fetch="git://git.openembedded.org" name="oe"/>
+  <remote fetch="http://git.yoctoproject.org/cgit/cgit.cgi" name="ti"/>
+  <remote fetch="https://github.com/Project-Olympus" name="ocs"/>
+
+  <project remote="yocto" revision="fido" name="poky" path="yocto"/>
+  <project remote="yocto" revision="fido-kilo" name="meta-cloud-services" path="yocto/meta-cloud-services"/>
+  <project remote="oe" revision="fido" name="meta-openembedded" path="yocto/meta-openembedded"/>
+  <project remote="ti" revision="fido" name="meta-ti" path="yocto/meta-ti"/>
+  <project remote="ocs" revision="master" name="meta-rackmanager" path="yocto/meta-rackmanager"/>
+  <project remote="ocs" revision="master" name="rackmanager-build" path="."/>
+  <project remote="ocs" revision="master" name="rackmanager"/>
+
+</manifest>

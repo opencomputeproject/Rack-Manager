@@ -1,0 +1,32 @@
+{
+    "$schema": "http://redfish.dmtf.org/schemas/v1/redfish-schema.v1_1_0.json",
+    "title": "#Redundancy",
+    "definitions": {
+        "Redundancy": {
+            "anyOf": [
+                {
+                    "$ref": "http://redfish.dmtf.org/schemas/v1/odata.4.0.0.json#/definitions/idRef"
+                },
+                {
+                    "$ref": "http://redfish.dmtf.org/schemas/v1/Redundancy.v1_0_0.json#/definitions/Redundancy"
+                },
+                {
+                    "$ref": "http://redfish.dmtf.org/schemas/v1/Redundancy.v1_0_1.json#/definitions/Redundancy"
+                },
+                {
+                    "$ref": "http://redfish.dmtf.org/schemas/v1/Redundancy.v1_0_2.json#/definitions/Redundancy"
+                },
+                {
+                    "$ref": "http://redfish.dmtf.org/schemas/v1/Redundancy.v1_0_3.json#/definitions/Redundancy"
+                },
+                {
+                    "$ref": "http://redfish.dmtf.org/schemas/v1/Redundancy.v1_1_0.json#/definitions/Redundancy"
+                },
+                {
+                    "$ref": "http://redfish.dmtf.org/schemas/v1/Redundancy.v1_1_1.json#/definitions/Redundancy"
+                }
+            ]
+        }
+    },
+    "copyright": "Copyright 2014-2016 Distributed Management Task Force, Inc. (DMTF). For the full DMTF copyright policy, see http://www.dmtf.org/about/policies/copyright"
+}

@@ -1,0 +1,3 @@
+#Defaults for tftpd-hpa
+RUN_DAEMON="yes"
+OPTIONS="-c -v -l -s /usr/srvroot/shared"

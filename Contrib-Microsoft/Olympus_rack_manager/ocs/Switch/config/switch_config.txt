@@ -1,0 +1,574 @@
+!
+! Enter Config
+config
+!
+hostname ocs-bmc-sw1
+no logging console
+!
+! Enter Line Console
+line console
+ speed 115200
+ no autobaud
+ no exec-timeout
+ exit
+! Enable all swtich ports
+interface range GigabitEthernet 1-48
+no negotiation
+speed 1000
+duplex full
+no shutdown
+exit
+!
+! Disable Spanning-Tree
+no spanning-tree
+!
+interface vlan 1
+no ip address dhcp
+!
+vlan database
+vlan 10-57
+exit
+ip dhcp server
+ip dhcp excluded-address 172.17.0.2 172.17.0.2
+ip dhcp excluded-address 172.17.0.6 172.17.0.6
+ip dhcp excluded-address 172.17.0.10 172.17.0.10
+ip dhcp excluded-address 172.17.0.14 172.17.0.14
+ip dhcp excluded-address 172.17.0.18 172.17.0.18
+ip dhcp excluded-address 172.17.0.22 172.17.0.22
+ip dhcp excluded-address 172.17.0.26 172.17.0.26
+ip dhcp excluded-address 172.17.0.30 172.17.0.30
+ip dhcp excluded-address 172.17.0.34 172.17.0.34
+ip dhcp excluded-address 172.17.0.38 172.17.0.38
+ip dhcp excluded-address 172.17.0.42 172.17.0.42
+ip dhcp excluded-address 172.17.0.46 172.17.0.46
+ip dhcp excluded-address 172.17.0.50 172.17.0.50
+ip dhcp excluded-address 172.17.0.54 172.17.0.54
+ip dhcp excluded-address 172.17.0.58 172.17.0.58
+ip dhcp excluded-address 172.17.0.62 172.17.0.62
+ip dhcp excluded-address 172.17.0.66 172.17.0.66
+ip dhcp excluded-address 172.17.0.70 172.17.0.70
+ip dhcp excluded-address 172.17.0.74 172.17.0.74
+ip dhcp excluded-address 172.17.0.78 172.17.0.78
+ip dhcp excluded-address 172.17.0.82 172.17.0.82
+ip dhcp excluded-address 172.17.0.86 172.17.0.86
+ip dhcp excluded-address 172.17.0.90 172.17.0.90
+ip dhcp excluded-address 172.17.0.94 172.17.0.94
+ip dhcp excluded-address 172.17.0.98 172.17.0.98
+ip dhcp excluded-address 172.17.0.102 172.17.0.102
+ip dhcp excluded-address 172.17.0.106 172.17.0.106
+ip dhcp excluded-address 172.17.0.110 172.17.0.110
+ip dhcp excluded-address 172.17.0.114 172.17.0.114
+ip dhcp excluded-address 172.17.0.118 172.17.0.118
+ip dhcp excluded-address 172.17.0.122 172.17.0.122
+ip dhcp excluded-address 172.17.0.126 172.17.0.126
+ip dhcp excluded-address 172.17.0.130 172.17.0.130
+ip dhcp excluded-address 172.17.0.134 172.17.0.134
+ip dhcp excluded-address 172.17.0.138 172.17.0.138
+ip dhcp excluded-address 172.17.0.142 172.17.0.142
+ip dhcp excluded-address 172.17.0.146 172.17.0.146
+ip dhcp excluded-address 172.17.0.150 172.17.0.150
+ip dhcp excluded-address 172.17.0.154 172.17.0.154
+ip dhcp excluded-address 172.17.0.158 172.17.0.158
+ip dhcp excluded-address 172.17.0.162 172.17.0.162
+ip dhcp excluded-address 172.17.0.166 172.17.0.166
+ip dhcp excluded-address 172.17.0.170 172.17.0.170
+ip dhcp excluded-address 172.17.0.174 172.17.0.174
+ip dhcp excluded-address 172.17.0.178 172.17.0.178
+ip dhcp excluded-address 172.17.0.182 172.17.0.182
+ip dhcp excluded-address 172.17.0.186 172.17.0.186
+ip dhcp excluded-address 172.17.0.190 172.17.0.190
+!
+ip dhcp pool network vlan_10
+address low 172.17.0.1 high 172.17.0.2 255.255.255.252
+exit
+ip dhcp pool network vlan_11
+address low 172.17.0.5 high 172.17.0.6 255.255.255.252
+exit
+ip dhcp pool network vlan_12
+address low 172.17.0.9 high 172.17.0.10 255.255.255.252
+exit                                                  
+ip dhcp pool network vlan_13
+address low 172.17.0.13 high 172.17.0.14 255.255.255.252
+exit
+ip dhcp pool network vlan_14
+address low 172.17.0.17 high 172.17.0.18 255.255.255.252
+exit
+ip dhcp pool network vlan_15
+address low 172.17.0.21 high 172.17.0.22 255.255.255.252
+exit
+ip dhcp pool network vlan_16
+address low 172.17.0.25 high 172.17.0.26 255.255.255.252
+exit
+ip dhcp pool network vlan_17
+address low 172.17.0.29 high 172.17.0.30 255.255.255.252
+exit
+ip dhcp pool network vlan_18
+address low 172.17.0.33 high 172.17.0.34 255.255.255.252
+exit
+ip dhcp pool network vlan_19
+address low 172.17.0.37 high 172.17.0.38 255.255.255.252
+exit
+ip dhcp pool network vlan_20                          
+address low 172.17.0.41 high 172.17.0.42 255.255.255.252
+exit
+ip dhcp pool network vlan_21
+address low 172.17.0.45 high 172.17.0.46 255.255.255.252
+exit
+ip dhcp pool network vlan_22
+address low 172.17.0.49 high 172.17.0.50 255.255.255.252
+exit
+ip dhcp pool network vlan_23
+address low 172.17.0.53 high 172.17.0.54 255.255.255.252
+exit
+ip dhcp pool network vlan_24
+address low 172.17.0.57 high 172.17.0.58 255.255.255.252
+exit
+ip dhcp pool network vlan_25
+address low 172.17.0.61 high 172.17.0.62 255.255.255.252
+exit
+ip dhcp pool network vlan_26
+address low 172.17.0.65 high 172.17.0.66 255.255.255.252
+exit
+ip dhcp pool network vlan_27
+address low 172.17.0.69 high 172.17.0.70 255.255.255.252  
+exit
+ip dhcp pool network vlan_28
+address low 172.17.0.73 high 172.17.0.74 255.255.255.252
+exit
+ip dhcp pool network vlan_29
+address low 172.17.0.77 high 172.17.0.78 255.255.255.252
+exit
+ip dhcp pool network vlan_30
+address low 172.17.0.81 high 172.17.0.82 255.255.255.252
+exit
+ip dhcp pool network vlan_31
+address low 172.17.0.85 high 172.17.0.86 255.255.255.252
+exit
+ip dhcp pool network vlan_32
+address low 172.17.0.89 high 172.17.0.90 255.255.255.252
+exit
+ip dhcp pool network vlan_33
+address low 172.17.0.93 high 172.17.0.94 255.255.255.252
+exit
+ip dhcp pool network vlan_34
+address low 172.17.0.97 high 172.17.0.98 255.255.255.252
+exit                                                  
+ip dhcp pool network vlan_35
+address low 172.17.0.101 high 172.17.0.102 255.255.255.252
+exit
+ip dhcp pool network vlan_36
+address low 172.17.0.105 high 172.17.0.106 255.255.255.252
+exit
+ip dhcp pool network vlan_37
+address low 172.17.0.109 high 172.17.0.110 255.255.255.252
+exit
+ip dhcp pool network vlan_38
+address low 172.17.0.113 high 172.17.0.114 255.255.255.252
+exit
+ip dhcp pool network vlan_39
+address low 172.17.0.117 high 172.17.0.118 255.255.255.252
+exit
+ip dhcp pool network vlan_40
+address low 172.17.0.121 high 172.17.0.122 255.255.255.252
+exit
+ip dhcp pool network vlan_41
+address low 172.17.0.125 high 172.17.0.126 255.255.255.252
+exit
+ip dhcp pool network vlan_42                          
+address low 172.17.0.129 high 172.17.0.130 255.255.255.252
+exit
+ip dhcp pool network vlan_43
+address low 172.17.0.133 high 172.17.0.134 255.255.255.252
+exit
+ip dhcp pool network vlan_44
+address low 172.17.0.137 high 172.17.0.138 255.255.255.252
+exit
+ip dhcp pool network vlan_45
+address low 172.17.0.141 high 172.17.0.142 255.255.255.252
+exit
+ip dhcp pool network vlan_46
+address low 172.17.0.145 high 172.17.0.146 255.255.255.252
+exit
+ip dhcp pool network vlan_47
+address low 172.17.0.149 high 172.17.0.150 255.255.255.252
+exit
+ip dhcp pool network vlan_48
+address low 172.17.0.153 high 172.17.0.154 255.255.255.252
+exit
+ip dhcp pool network vlan_49
+address low 172.17.0.157 high 172.17.0.158 255.255.255.252
+exit
+ip dhcp pool network vlan_50
+address low 172.17.0.161 high 172.17.0.162 255.255.255.252
+exit
+ip dhcp pool network vlan_51
+address low 172.17.0.165 high 172.17.0.166 255.255.255.252
+exit
+ip dhcp pool network vlan_52
+address low 172.17.0.169 high 172.17.0.170 255.255.255.252
+exit
+ip dhcp pool network vlan_53
+address low 172.17.0.173 high 172.17.0.174 255.255.255.252
+exit
+ip dhcp pool network vlan_54
+address low 172.17.0.177 high 172.17.0.178 255.255.255.252
+exit
+ip dhcp pool network vlan_55
+address low 172.17.0.181 high 172.17.0.182 255.255.255.252
+exit
+ip dhcp pool network vlan_56
+address low 172.17.0.185 high 172.17.0.186 255.255.255.252
+exit                                                  
+ip dhcp pool network vlan_57
+address low 172.17.0.189 high 172.17.0.190 255.255.255.252
+exit
+ip access-list extended isolated
+permit ip any 172.17.0.201 0.0.0.3 ace-priority 20
+permit udp any bootps any bootpc ace-priority 40
+permit udp any bootpc any bootps ace-priority 50
+deny ip any any ace-priority 80
+exit
+!
+interface vlan 1
+ ip address 172.17.0.201 255.255.255.252
+ no ip address dhcp
+!
+interface vlan 10
+ ip address 172.17.0.2 255.255.255.252
+!
+interface vlan 11
+ ip address 172.17.0.6 255.255.255.252
+!
+interface vlan 12
+ ip address 172.17.0.10 255.255.255.252                 
+!
+interface vlan 13
+ ip address 172.17.0.14 255.255.255.252
+!
+interface vlan 14
+ ip address 172.17.0.18 255.255.255.252
+!
+interface vlan 15
+ ip address 172.17.0.22 255.255.255.252
+!
+interface vlan 16
+ ip address 172.17.0.26 255.255.255.252
+!
+interface vlan 17
+ ip address 172.17.0.30 255.255.255.252
+!
+interface vlan 18
+ ip address 172.17.0.34 255.255.255.252
+!
+interface vlan 19
+ ip address 172.17.0.38 255.255.255.252
+!                                                     
+interface vlan 20
+ ip address 172.17.0.42 255.255.255.252
+!
+interface vlan 21
+ ip address 172.17.0.46 255.255.255.252
+!
+interface vlan 22
+ ip address 172.17.0.50 255.255.255.252
+!
+interface vlan 23
+ ip address 172.17.0.54 255.255.255.252
+!
+interface vlan 24
+ ip address 172.17.0.58 255.255.255.252
+!
+interface vlan 25
+ ip address 172.17.0.62 255.255.255.252
+!
+interface vlan 26
+ ip address 172.17.0.66 255.255.255.252
+!
+interface vlan 27                                     
+ ip address 172.17.0.70 255.255.255.252
+!
+interface vlan 28
+ ip address 172.17.0.74 255.255.255.252
+!
+interface vlan 29
+ ip address 172.17.0.78 255.255.255.252
+!
+interface vlan 30
+ ip address 172.17.0.82 255.255.255.252
+!
+interface vlan 31
+ ip address 172.17.0.86 255.255.255.252
+!
+interface vlan 32
+ ip address 172.17.0.90 255.255.255.252
+!
+interface vlan 33
+ ip address 172.17.0.94 255.255.255.252
+!
+interface vlan 34
+ ip address 172.17.0.98 255.255.255.252                 
+!
+interface vlan 35
+ ip address 172.17.0.102 255.255.255.252
+!
+interface vlan 36
+ ip address 172.17.0.106 255.255.255.252
+!
+interface vlan 37
+ ip address 172.17.0.110 255.255.255.252
+!
+interface vlan 38
+ ip address 172.17.0.114 255.255.255.252
+!
+interface vlan 39
+ ip address 172.17.0.118 255.255.255.252
+!
+interface vlan 40
+ ip address 172.17.0.122 255.255.255.252
+!
+interface vlan 41
+ ip address 172.17.0.126 255.255.255.252
+!                                                     
+interface vlan 42
+ ip address 172.17.0.130 255.255.255.252
+!
+interface vlan 43
+ ip address 172.17.0.134 255.255.255.252
+!
+interface vlan 44
+ ip address 172.17.0.138 255.255.255.252
+!
+interface vlan 45
+ ip address 172.17.0.142 255.255.255.252
+!
+interface vlan 46
+ ip address 172.17.0.146 255.255.255.252
+!
+interface vlan 47
+ ip address 172.17.0.150 255.255.255.252
+!
+interface vlan 48
+ ip address 172.17.0.154 255.255.255.252
+!
+interface vlan 49                                     
+ ip address 172.17.0.158 255.255.255.252
+!
+interface vlan 50
+ ip address 172.17.0.162 255.255.255.252
+!
+interface vlan 51
+ ip address 172.17.0.166 255.255.255.252
+!
+interface vlan 52
+ ip address 172.17.0.170 255.255.255.252
+!
+interface vlan 53
+ ip address 172.17.0.174 255.255.255.252
+!
+interface vlan 54
+ ip address 172.17.0.178 255.255.255.252
+!
+interface vlan 55
+ ip address 172.17.0.182 255.255.255.252
+!
+interface vlan 56
+ ip address 172.17.0.186 255.255.255.252                
+!
+interface vlan 57
+ ip address 172.17.0.190 255.255.255.252
+!
+interface GigabitEthernet1
+ service-acl input isolated
+ switchport access vlan 10
+!
+interface GigabitEthernet2
+ service-acl input isolated
+ switchport access vlan 11
+!
+interface GigabitEthernet3
+ service-acl input isolated
+ switchport access vlan 12
+!
+interface GigabitEthernet4
+ service-acl input isolated
+ switchport access vlan 13
+!
+interface GigabitEthernet5
+ speed 1000
+ service-acl input isolated                           
+ switchport access vlan 14
+!
+interface GigabitEthernet6
+ service-acl input isolated
+ switchport access vlan 15
+!
+interface GigabitEthernet7
+ service-acl input isolated
+ switchport access vlan 16
+!
+interface GigabitEthernet8
+ service-acl input isolated
+ switchport access vlan 17
+!
+interface GigabitEthernet9
+ service-acl input isolated
+ switchport access vlan 18
+!
+interface GigabitEthernet10
+ service-acl input isolated
+ switchport access vlan 19
+!                                                     
+interface GigabitEthernet11
+ service-acl input isolated
+ switchport access vlan 20
+!
+interface GigabitEthernet12
+ service-acl input isolated
+ switchport access vlan 21
+!
+interface GigabitEthernet13
+ service-acl input isolated
+ switchport access vlan 22
+!
+interface GigabitEthernet14
+ service-acl input isolated
+ switchport access vlan 23
+!
+interface GigabitEthernet15
+ service-acl input isolated
+ switchport access vlan 24
+!
+interface GigabitEthernet16
+ service-acl input isolated                           
+ switchport access vlan 25
+!
+interface GigabitEthernet17
+ service-acl input isolated
+ switchport access vlan 26
+!
+interface GigabitEthernet18
+ service-acl input isolated
+ switchport access vlan 27
+!
+interface GigabitEthernet19
+ service-acl input isolated
+ switchport access vlan 28
+!
+interface GigabitEthernet20
+ service-acl input isolated
+ switchport access vlan 29
+!
+interface GigabitEthernet21
+ service-acl input isolated
+ switchport access vlan 30
+!                                                     
+interface GigabitEthernet22
+ service-acl input isolated
+ switchport access vlan 31
+!
+interface GigabitEthernet23
+ service-acl input isolated
+ switchport access vlan 32
+!
+interface GigabitEthernet24
+ service-acl input isolated
+ switchport access vlan 33
+!
+interface GigabitEthernet25
+ no service-acl input
+ switchport access vlan 1
+!
+interface GigabitEthernet26
+ service-acl input isolated
+ switchport access vlan 35
+!
+interface GigabitEthernet27
+ service-acl input isolated                           
+ switchport access vlan 36
+!
+interface GigabitEthernet28
+ service-acl input isolated
+ switchport access vlan 37
+!
+interface GigabitEthernet29
+ service-acl input isolated
+ switchport access vlan 38
+!
+interface GigabitEthernet30
+ service-acl input isolated
+ switchport access vlan 39
+!
+interface GigabitEthernet31
+ service-acl input isolated
+ switchport access vlan 40
+!
+interface GigabitEthernet32
+ service-acl input isolated
+ switchport access vlan 41
+!                                                     
+interface GigabitEthernet33
+ service-acl input isolated
+ switchport access vlan 42
+!
+interface GigabitEthernet34
+ service-acl input isolated
+ switchport access vlan 43
+!
+interface GigabitEthernet35
+ service-acl input isolated
+ switchport access vlan 44
+!
+interface GigabitEthernet36
+ service-acl input isolated
+ switchport access vlan 45
+!
+interface GigabitEthernet37
+ service-acl input isolated
+ switchport access vlan 46
+!
+interface GigabitEthernet38
+ service-acl input isolated                           
+ switchport access vlan 47
+!
+interface GigabitEthernet39
+ service-acl input isolated
+ switchport access vlan 48
+!
+interface GigabitEthernet40
+ service-acl input isolated
+ switchport access vlan 49
+!
+interface GigabitEthernet41
+ service-acl input isolated
+ switchport access vlan 50
+!
+interface GigabitEthernet42
+ service-acl input isolated
+ switchport access vlan 51
+!
+interface GigabitEthernet43
+ service-acl input isolated
+ switchport access vlan 52
+!                                                     
+interface GigabitEthernet44
+ service-acl input isolated
+ switchport access vlan 53
+!
+interface GigabitEthernet45
+ service-acl input isolated
+ switchport access vlan 54
+!
+interface GigabitEthernet46
+ service-acl input isolated
+ switchport access vlan 55
+!
+interface GigabitEthernet47
+ service-acl input isolated
+ switchport access vlan 56
+!
+interface GigabitEthernet48
+ service-acl input isolated
+ switchport access vlan 57
+!
+exit
+exit
