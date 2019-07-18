@@ -1,0 +1,33 @@
+export default {
+  title: '资产信息',
+  sub_title: '系统设备资产信息列表',
+  cpu: 'CPU',
+  thead_name: '名称',
+  thead_model: '型号',
+  thead_status: '健康状态',
+  thead_speed: '速度（MHz）',
+  thead_core: '核数',
+  thead_tdp: 'TDP(W)',
+  thead_l1: '一级缓存(KB)',
+  thead_l2: '二级缓存(KB)',
+  thead_l3: '三级缓存(KB)',
+  mem: '内存',
+  thead_loc: '位置',
+  thead_size: '容量(GB)',
+  thead_type: '类型',
+  thead_mf: '最大频率(Mhz)',
+  thead_manufacturer: '厂商',
+  thead_pn: '部件号',
+  thead_sn: '序列号',
+  thead_mv: '最小电压(V)',
+  thead_rank: 'Rank',
+  psu: '电源',
+  fan: '风扇',
+  temperature: '温度',
+  voltage: '电压',
+  power_consumption: '功耗',
+
+  get_err_msg: '获取资产信息失败',
+  helpMsg: `您可以在该页面查看系统资产和状态信息，通过选择不同标签页查看不同设备的资产和状态信息。其中包括：
+            CPU、内存、电源、风扇、温度、电压和功耗信息`
+}

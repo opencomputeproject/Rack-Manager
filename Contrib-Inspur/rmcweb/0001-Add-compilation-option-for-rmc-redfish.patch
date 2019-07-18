@@ -1,0 +1,97 @@
+From 5ab442064c2b643ef65025c3cb56d0391ccd34ba Mon Sep 17 00:00:00 2001
+From: John Wang <wangzqbj@inspur.com>
+Date: Tue, 5 Mar 2019 15:20:46 +0800
+Subject: [PATCH 1/4] Add compilation option for rmc redfish
+
+CMakeLists.txt:
+option(BMCWEB_ENABLE_REDFISH_BMC "enable rmc redfish in bmc webserver" OFF)
+
+Signed-off-by: John Wang <wangzqbj@inspur.com>
+---
+ CMakeLists.txt         | 10 +++++++++-
+ src/webserver_main.cpp |  9 +++++++++
+ 2 files changed, 18 insertions(+), 1 deletion(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 6756575..9fde28b 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -32,6 +32,7 @@ option (BMCWEB_ENABLE_REDFISH_RAW_PECI "Enable PECI transactions through
+ option (BMCWEB_ENABLE_REDFISH_CPU_LOG "Enable CPU log service transactions
+        through Redfish.  Paths are under
+        '/redfish/v1/Systems/system/LogServices/CpuLog'." OFF)
++option (DBMCWEB_ENABLE_REDFISH_RMC "enable rmc redfish in bmc webserver" OFF)
+ 
+ # Insecure options.  Every option that starts with a BMCWEB_INSECURE flag should
+ # not be enabled by default for any platform, unless the author fully
+@@ -118,6 +119,7 @@ if (NOT ${YOCTO_DEPENDENCIES}) # Download and unpack googletest at configure
+ endif ()
+ 
+ # add_definitions(-DBOOST_ASIO_ENABLE_HANDLER_TRACKING)
++add_definitions (-DBOOST_ALLOW_DEPRECATED_HEADERS)
+ add_definitions (-DBOOST_ASIO_DISABLE_THREADS)
+ add_definitions (-DBOOST_ERROR_CODE_HEADER_ONLY)
+ add_definitions (-DBOOST_SYSTEM_NO_DEPRECATED)
+@@ -235,11 +237,16 @@ if (${BMCWEB_BUILD_UT})
+ endif (${BMCWEB_BUILD_UT})
+ 
+ install (DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/static/ DESTINATION share/www)
+-
++# cpr
++add_subdirectory(cpr)
++include_directories(${CPR_INCLUDE_DIRS})
++add_executable (cprtest src/cpr_test.cpp)
++target_link_libraries (cprtest ${CPR_LIBRARIES})
+ # bmcweb
+ add_executable (bmcweb ${WEBSERVER_MAIN} ${HDR_FILES} ${SRC_FILES})
+ target_link_libraries (bmcweb ${OPENSSL_LIBRARIES})
+ target_link_libraries (bmcweb ${ZLIB_LIBRARIES})
++target_link_libraries (bmcweb ${CPR_LIBRARIES})
+ target_link_libraries (bmcweb pam)
+ target_link_libraries (bmcweb -latomic)
+ target_link_libraries (bmcweb -lsystemd)
+@@ -264,4 +271,5 @@ target_compile_definitions (
+     $<$<BOOL:${BMCWEB_ENABLE_REDFISH_RAW_PECI}>: -DBMCWEB_ENABLE_REDFISH_RAW_PECI>
+     $<$<BOOL:${BMCWEB_ENABLE_REDFISH_CPU_LOG}>: -DBMCWEB_ENABLE_REDFISH_CPU_LOG>
+     $<$<BOOL:${BMCWEB_ENABLE_REDFISH_BMC_JOURNAL}>: -DBMCWEB_ENABLE_REDFISH_BMC_JOURNAL>
++    $<$<BOOL:${BMCWEB_ENABLE_REDFISH_RMC}>: -DBMCWEB_ENABLE_REDFISH_RMC>
+ )
+diff --git a/src/webserver_main.cpp b/src/webserver_main.cpp
+index 7c64f4c..ac476cc 100644
+--- a/src/webserver_main.cpp
++++ b/src/webserver_main.cpp
+@@ -9,7 +9,11 @@
+ #include <obmc_console.hpp>
+ #include <openbmc_dbus_rest.hpp>
+ #include <persistent_data_middleware.hpp>
++#ifdef BMCWEB_ENABLE_REDFISH_RMC
++#include <rmc_redfish.hpp>
++#else
+ #include <redfish.hpp>
++#endif
+ #include <redfish_v1.hpp>
+ #include <sdbusplus/asio/connection.hpp>
+ #include <sdbusplus/bus.hpp>
+@@ -21,6 +25,7 @@
+ #include <web_kvm.hpp>
+ #include <webassets.hpp>
+ #include <webserver_common.hpp>
++#include <cpr/cpr.h>
+ 
+ constexpr int defaultPort = 18080;
+ 
+@@ -101,7 +106,11 @@ int main(int argc, char** argv)
+ 
+     crow::connections::systemBus =
+         std::make_shared<sdbusplus::asio::connection>(*io);
++#ifdef BMCWEB_ENABLE_REDFISH_RMC
++    redfish::RmcRedfishService redfish(app);
++#else
+     redfish::RedfishService redfish(app);
++#endif
+ 
+     app.run();
+     io->run();
+-- 
+2.17.1
+

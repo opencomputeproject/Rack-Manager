@@ -1,0 +1,47 @@
+From 958049845cd2a4b4dfe394281d5ecb6451a18bca Mon Sep 17 00:00:00 2001
+From: John Wang <wangzqbj@inspur.com>
+Date: Wed, 26 Jun 2019 19:51:30 +0800
+Subject: [PATCH 4/4] Add thermal interface
+
+---
+ redfish-core/lib/rmc_thermal.hpp | 18 ++++++------------
+ 1 file changed, 6 insertions(+), 12 deletions(-)
+
+diff --git a/redfish-core/lib/rmc_thermal.hpp b/redfish-core/lib/rmc_thermal.hpp
+index 9564bc8..859a3ae 100644
+--- a/redfish-core/lib/rmc_thermal.hpp
++++ b/redfish-core/lib/rmc_thermal.hpp
+@@ -101,24 +101,18 @@ class Thermal : public Node
+     void doGet(crow::Response& res, const crow::Request& req,
+                const std::vector<std::string>& params) override
+     {
+-        if (params.size() != 1)
++        if (params.size() != 2)
+         {
+             messages::internalError(res);
+             res.end();
+             return;
+         }
+         const std::string& chassisName = params[0];
+-        res.jsonValue["@odata.type"] = "#Thermal.v1_4_0.Thermal";
+-        res.jsonValue["@odata.context"] =
+-            "/redfish/v1/$metadata#Thermal.Thermal";
+-        res.jsonValue["Id"] = "Thermal";
+-        res.jsonValue["Name"] = "Thermal";
+-
+-        res.jsonValue["@odata.id"] =
+-            "/redfish/v1/Chassis/" + chassisName + "/Thermal";
+-
+-        auto asyncResp = std::make_shared<AsyncResp>(res);
+-        getThermalInfo(chassisName, asyncResp);
++	const std::string& chassisIp = params[1];
++	auto r = cpr::Get(cpr::Url{"https://" + chassisIp + "/redfish/v1/Chassis/" +
++			chassisName + "/Thermal"},cpr::Authentication{"root", "0penBmc"});
++	res = nlohmann::json::parse(r.text);
++	res.end();
+     }
+ };
+ 
+-- 
+2.17.1
+

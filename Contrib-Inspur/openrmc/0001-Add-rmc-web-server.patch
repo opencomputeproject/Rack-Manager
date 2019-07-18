@@ -1,0 +1,26 @@
+From 74106f7b4431572716c2050114b5df575269375e Mon Sep 17 00:00:00 2001
+From: John Wang <wangzqbj@inspur.com>
+Date: Fri, 24 May 2019 09:56:26 +0800
+Subject: [PATCH 1/4] Add rmc web server
+
+Signed-off-by: John Wang <wangzqbj@inspur.com>
+---
+ .../meta-on5263m5/recipes-phosphor/bmcweb/bmcweb_%.bbappend | 6 ++++++
+ 1 file changed, 6 insertions(+)
+ create mode 100644 meta-inspur/meta-on5263m5/recipes-phosphor/bmcweb/bmcweb_%.bbappend
+
+diff --git a/meta-inspur/meta-on5263m5/recipes-phosphor/bmcweb/bmcweb_%.bbappend b/meta-inspur/meta-on5263m5/recipes-phosphor/bmcweb/bmcweb_%.bbappend
+new file mode 100644
+index 000000000..c14c2599f
+--- /dev/null
++++ b/meta-inspur/meta-on5263m5/recipes-phosphor/bmcweb/bmcweb_%.bbappend
+@@ -0,0 +1,6 @@
++FILESEXTRAPATHS_prepend := "${THISDIR}/${PN}:"
++
++SRC_URI = "git://github.com/inspur-bmc/rmcweb;protocol=https;branch=rmcweb"
++SRCREV = "ec8ce2a09b851ff5da59b0b9faba5c035c5e0faf"
++
++EXTRA_OECMAKE += "-DDBMCWEB_ENABLE_REDFISH_RMC=ON"
+-- 
+2.17.1
+

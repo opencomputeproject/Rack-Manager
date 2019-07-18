@@ -1,0 +1,24 @@
+From cc5a138bdc05131984824346f4e9156ea958b28f Mon Sep 17 00:00:00 2001
+From: John Wang <wangzqbj@inspur.com>
+Date: Fri, 24 May 2019 09:57:47 +0800
+Subject: [PATCH 2/4] Add webui
+
+Signed-off-by: John Wang <wangzqbj@inspur.com>
+---
+ .../recipes-phosphor/webui/phosphor-webui_%.bbappend          | 4 ++++
+ 1 file changed, 4 insertions(+)
+ create mode 100644 meta-inspur/meta-on5263m5/recipes-phosphor/webui/phosphor-webui_%.bbappend
+
+diff --git a/meta-inspur/meta-on5263m5/recipes-phosphor/webui/phosphor-webui_%.bbappend b/meta-inspur/meta-on5263m5/recipes-phosphor/webui/phosphor-webui_%.bbappend
+new file mode 100644
+index 000000000..f24c0a621
+--- /dev/null
++++ b/meta-inspur/meta-on5263m5/recipes-phosphor/webui/phosphor-webui_%.bbappend
+@@ -0,0 +1,4 @@
++FILESEXTRAPATHS_prepend := "${THISDIR}/${PN}:"
++
++SRC_URI = "git://github.com/inspur-bmc/OR-web;protocol=https"
++SRCREV = "01f344122eabed24ba70e6740526ae7cb4f22cdb"
+-- 
+2.17.1
+

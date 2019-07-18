@@ -1,0 +1,643 @@
+From 6d094449c634f189c70a8abfac16cf8e62c4146b Mon Sep 17 00:00:00 2001
+From: John Wang <wangzqbj@inspur.com>
+Date: Wed, 26 Jun 2019 19:26:27 +0800
+Subject: [PATCH 3/4] Add meta-openrmc
+
+Signed-off-by: John Wang <wangzqbj@inspur.com>
+---
+ meta-inspur/meta-on5263m5/conf/layer.conf     |   3 +-
+ .../meta-openrmc/conf/bblayers.conf.sample    |  19 ++
+ meta-inspur/meta-openrmc/conf/conf-notes.txt  |   4 +
+ meta-inspur/meta-openrmc/conf/layer.conf      |  11 +
+ .../meta-openrmc/conf/local.conf.sample       | 241 ++++++++++++++++++
+ .../meta-openrmc/conf/machine/openrmc.conf    |  12 +
+ .../recipes-phosphor/bmcweb/bmcweb_%.bbappend |   6 +
+ .../bus@1e78a000/i2c-bus@1c0/tmp112@48.conf   |   5 +
+ .../bus@1e78a000/i2c-bus@1c0/tmp421@4e.conf   |   7 +
+ .../bus@1e78a000/i2c-bus@300/adm1278@11.conf  |   4 +
+ .../apb/pwm-tacho-controller@1e786000.conf    |   9 +
+ .../phosphor-hwmon/obmc/hwmon/iio-hwmon.conf  |   8 +
+ .../sensors/phosphor-hwmon_%.bbappend         |  19 ++
+ .../skeleton/obmc-libobmc-intf/gpio_defs.json |  47 ++++
+ .../skeleton/obmc-libobmc-intf_%.bbappend     |   1 +
+ .../webui/phosphor-webui_%.bbappend           |   4 +
+ .../workbook/openrmc-config.bb                |  38 +++
+ .../workbook/openrmc-config/Openrmc.py        |  48 ++++
+ 18 files changed, 484 insertions(+), 2 deletions(-)
+ create mode 100644 meta-inspur/meta-openrmc/conf/bblayers.conf.sample
+ create mode 100644 meta-inspur/meta-openrmc/conf/conf-notes.txt
+ create mode 100644 meta-inspur/meta-openrmc/conf/layer.conf
+ create mode 100644 meta-inspur/meta-openrmc/conf/local.conf.sample
+ create mode 100644 meta-inspur/meta-openrmc/conf/machine/openrmc.conf
+ create mode 100644 meta-inspur/meta-openrmc/recipes-phosphor/bmcweb/bmcweb_%.bbappend
+ create mode 100644 meta-inspur/meta-openrmc/recipes-phosphor/sensors/phosphor-hwmon/obmc/hwmon/ahb/apb/bus@1e78a000/i2c-bus@1c0/tmp112@48.conf
+ create mode 100644 meta-inspur/meta-openrmc/recipes-phosphor/sensors/phosphor-hwmon/obmc/hwmon/ahb/apb/bus@1e78a000/i2c-bus@1c0/tmp421@4e.conf
+ create mode 100644 meta-inspur/meta-openrmc/recipes-phosphor/sensors/phosphor-hwmon/obmc/hwmon/ahb/apb/bus@1e78a000/i2c-bus@300/adm1278@11.conf
+ create mode 100644 meta-inspur/meta-openrmc/recipes-phosphor/sensors/phosphor-hwmon/obmc/hwmon/ahb/apb/pwm-tacho-controller@1e786000.conf
+ create mode 100644 meta-inspur/meta-openrmc/recipes-phosphor/sensors/phosphor-hwmon/obmc/hwmon/iio-hwmon.conf
+ create mode 100644 meta-inspur/meta-openrmc/recipes-phosphor/sensors/phosphor-hwmon_%.bbappend
+ create mode 100644 meta-inspur/meta-openrmc/recipes-phosphor/skeleton/obmc-libobmc-intf/gpio_defs.json
+ create mode 100644 meta-inspur/meta-openrmc/recipes-phosphor/skeleton/obmc-libobmc-intf_%.bbappend
+ create mode 100644 meta-inspur/meta-openrmc/recipes-phosphor/webui/phosphor-webui_%.bbappend
+ create mode 100644 meta-inspur/meta-openrmc/recipes-phosphor/workbook/openrmc-config.bb
+ create mode 100644 meta-inspur/meta-openrmc/recipes-phosphor/workbook/openrmc-config/Openrmc.py
+
+diff --git a/meta-inspur/meta-on5263m5/conf/layer.conf b/meta-inspur/meta-on5263m5/conf/layer.conf
+index 93db95c5c..c35d7759a 100644
+--- a/meta-inspur/meta-on5263m5/conf/layer.conf
++++ b/meta-inspur/meta-on5263m5/conf/layer.conf
+@@ -8,5 +8,4 @@ BBFILES += "${LAYERDIR}/recipes-*/*/*.bb \
+ BBFILE_COLLECTIONS += "on5263m5-layer"
+ BBFILE_PATTERN_on5263m5-layer = ""
+ BBFILE_PRIORITY_on5263m5-layer = "5"
+-LAYERSERIES_COMPAT_on5263m5-layer = "sumo"
+-
++LAYERSERIES_COMPAT_on5263m5-layer = "warrior"
+diff --git a/meta-inspur/meta-openrmc/conf/bblayers.conf.sample b/meta-inspur/meta-openrmc/conf/bblayers.conf.sample
+new file mode 100644
+index 000000000..fe404d910
+--- /dev/null
++++ b/meta-inspur/meta-openrmc/conf/bblayers.conf.sample
+@@ -0,0 +1,19 @@
++# LAYER_CONF_VERSION is increased each time build/conf/bblayers.conf
++# changes incompatibly
++LCONF_VERSION = "8"
++
++BBPATH = "${TOPDIR}"
++BBFILES ?= ""
++
++BBLAYERS ?= " \
++  ##OEROOT##/meta \
++  ##OEROOT##/meta-openembedded/meta-oe \
++  ##OEROOT##/meta-openembedded/meta-networking \
++  ##OEROOT##/meta-openembedded/meta-perl \
++  ##OEROOT##/meta-openembedded/meta-python \
++  ##OEROOT##/meta-phosphor \
++  ##OEROOT##/meta-aspeed \
++  ##OEROOT##/meta-x86 \
++  ##OEROOT##/meta-inspur \
++  ##OEROOT##/meta-inspur/meta-openrmc\
++"
+diff --git a/meta-inspur/meta-openrmc/conf/conf-notes.txt b/meta-inspur/meta-openrmc/conf/conf-notes.txt
+new file mode 100644
+index 000000000..5314bf4e6
+--- /dev/null
++++ b/meta-inspur/meta-openrmc/conf/conf-notes.txt
+@@ -0,0 +1,4 @@
++Common targets are:
++    obmc-phosphor-image
++    virtual/kernel
++    phosphor-ipmi-host
+diff --git a/meta-inspur/meta-openrmc/conf/layer.conf b/meta-inspur/meta-openrmc/conf/layer.conf
+new file mode 100644
+index 000000000..edab1a344
+--- /dev/null
++++ b/meta-inspur/meta-openrmc/conf/layer.conf
+@@ -0,0 +1,11 @@
++# We have a conf and classes directory, add to BBPATH
++BBPATH .= ":${LAYERDIR}"
++
++# We have recipes-* directories, add to BBFILES
++BBFILES += "${LAYERDIR}/recipes-*/*/*.bb \
++            ${LAYERDIR}/recipes-*/*/*.bbappend"
++
++BBFILE_COLLECTIONS += "openrmc-layer"
++BBFILE_PATTERN_openrmc-layer = ""
++BBFILE_PRIORITY_openrmc-layer = "5"
++LAYERSERIES_COMPAT_openrmc-layer = "warrior"
+diff --git a/meta-inspur/meta-openrmc/conf/local.conf.sample b/meta-inspur/meta-openrmc/conf/local.conf.sample
+new file mode 100644
+index 000000000..7710d3195
+--- /dev/null
++++ b/meta-inspur/meta-openrmc/conf/local.conf.sample
+@@ -0,0 +1,241 @@
++#
++# This file is your local configuration file and is where all local user settings
++# are placed. The comments in this file give some guide to the options a new user
++# to the system might want to change but pretty much any configuration option can
++# be set in this file. More adventurous users can look at local.conf.extended
++# which contains other examples of configuration which can be placed in this file
++# but new users likely won't need any of them initially.
++#
++# Lines starting with the '#' character are commented out and in some cases the
++# default values are provided as comments to show people example syntax. Enabling
++# the option is a question of removing the # character and making any change to the
++# variable as required.
++
++#
++# Machine Selection
++#
++# You need to select a specific machine to target the build with. There are a selection
++# of emulated machines available which can boot and run in the QEMU emulator:
++#
++#MACHINE ?= "qemuarm"
++#MACHINE ?= "qemuarm64"
++#MACHINE ?= "qemumips"
++#MACHINE ?= "qemuppc"
++#MACHINE ?= "qemux86"
++#MACHINE ?= "qemux86-64"
++#
++# There are also the following hardware board target machines included for
++# demonstration purposes:
++#
++#MACHINE ?= "beaglebone"
++#MACHINE ?= "genericx86"
++#MACHINE ?= "genericx86-64"
++#MACHINE ?= "mpc8315e-rdb"
++#MACHINE ?= "edgerouter"
++#
++# This sets the default machine to be qemux86 if no other machine is selected:
++
++MACHINE ?= "openrmc"
++
++#
++# Where to place downloads
++#
++# During a first build the system will download many different source code tarballs
++# from various upstream projects. This can take a while, particularly if your network
++# connection is slow. These are all stored in DL_DIR. When wiping and rebuilding you
++# can preserve this directory to speed up this part of subsequent builds. This directory
++# is safe to share between multiple builds on the same machine too.
++#
++# The default is a downloads directory under TOPDIR which is the build directory.
++#
++#DL_DIR ?= "${TOPDIR}/downloads"
++#
++# Where to place shared-state files
++#
++# BitBake has the capability to accelerate builds based on previously built output.
++# This is done using "shared state" files which can be thought of as cache objects
++# and this option determines where those files are placed.
++#
++# You can wipe out TMPDIR leaving this directory intact and the build would regenerate
++# from these files if no changes were made to the configuration. If changes were made
++# to the configuration, only shared state files where the state was still valid would
++# be used (done using checksums).
++#
++# The default is a sstate-cache directory under TOPDIR.
++#
++#SSTATE_DIR ?= "${TOPDIR}/sstate-cache"
++
++#
++# Where to place the build output
++#
++# This option specifies where the bulk of the building work should be done and
++# where BitBake should place its temporary files and output. Keep in mind that
++# this includes the extraction and compilation of many applications and the toolchain
++# which can use Gigabytes of hard disk space.
++#
++# The default is a tmp directory under TOPDIR.
++#
++#TMPDIR = "${TOPDIR}/tmp"
++
++#
++# Default policy config
++#
++# The distribution setting controls which policy settings are used as defaults.
++# The default value is fine for general Yocto project use, at least initially.
++# Ultimately when creating custom policy, people will likely end up subclassing
++# these defaults.
++#
++DISTRO ?= "openbmc-phosphor"
++# As an example of a subclass there is a "bleeding" edge policy configuration
++# where many versions are set to the absolute latest code from the upstream
++# source control systems. This is just mentioned here as an example, its not
++# useful to most new users.
++# DISTRO ?= "poky-bleeding"
++
++#
++# Package Management configuration
++#
++# This variable lists which packaging formats to enable. Multiple package backends
++# can be enabled at once and the first item listed in the variable will be used
++# to generate the root filesystems.
++# Options are:
++#  - 'package_deb' for debian style deb files
++#  - 'package_ipk' for ipk files are used by opkg (a debian style embedded package manager)
++#  - 'package_rpm' for rpm style packages
++# E.g.: PACKAGE_CLASSES ?= "package_rpm package_deb package_ipk"
++# We default to rpm:
++PACKAGE_CLASSES ?= "package_rpm"
++
++#
++# SDK/ADT target architecture
++#
++# This variable specifies the architecture to build SDK/ADT items for and means
++# you can build the SDK packages for architectures other than the machine you are
++# running the build on (i.e. building i686 packages on an x86_64 host).
++# Supported values are i686 and x86_64
++#SDKMACHINE ?= "i686"
++SANITY_TESTED_DISTROS_append ?= " RedHatEnterpriseWorkstation-6.*"
++
++#
++# Extra image configuration defaults
++#
++# The EXTRA_IMAGE_FEATURES variable allows extra packages to be added to the generated
++# images. Some of these options are added to certain image types automatically. The
++# variable can contain the following options:
++#  "dbg-pkgs"       - add -dbg packages for all installed packages
++#                     (adds symbol information for debugging/profiling)
++#  "dev-pkgs"       - add -dev packages for all installed packages
++#                     (useful if you want to develop against libs in the image)
++#  "ptest-pkgs"     - add -ptest packages for all ptest-enabled packages
++#                     (useful if you want to run the package test suites)
++#  "tools-sdk"      - add development tools (gcc, make, pkgconfig etc.)
++#  "tools-debug"    - add debugging tools (gdb, strace)
++#  "eclipse-debug"  - add Eclipse remote debugging support
++#  "tools-profile"  - add profiling tools (oprofile, exmap, lttng, valgrind)
++#  "tools-testapps" - add useful testing tools (ts_print, aplay, arecord etc.)
++#  "debug-tweaks"   - make an image suitable for development
++#                     e.g. ssh root access has a blank password
++# There are other application targets that can be used here too, see
++# meta/classes/image.bbclass and meta/classes/core-image.bbclass for more details.
++# We default to enabling the debugging tweaks.
++EXTRA_IMAGE_FEATURES = "debug-tweaks"
++
++#
++# Additional image features
++#
++# The following is a list of additional classes to use when building images which
++# enable extra features. Some available options which can be included in this variable
++# are:
++#   - 'buildstats' collect build statistics
++#   - 'image-mklibs' to reduce shared library files size for an image
++#   - 'image-prelink' in order to prelink the filesystem image
++#   - 'image-swab' to perform host system intrusion detection
++# NOTE: if listing mklibs & prelink both, then make sure mklibs is before prelink
++# NOTE: mklibs also needs to be explicitly enabled for a given image, see local.conf.extended
++USER_CLASSES ?= "buildstats image-mklibs image-prelink"
++
++#
++# Runtime testing of images
++#
++# The build system can test booting virtual machine images under qemu (an emulator)
++# after any root filesystems are created and run tests against those images. To
++# enable this uncomment this line. See classes/testimage(-auto).bbclass for
++# further details.
++#TEST_IMAGE = "1"
++#
++# Interactive shell configuration
++#
++# Under certain circumstances the system may need input from you and to do this it
++# can launch an interactive shell. It needs to do this since the build is
++# multithreaded and needs to be able to handle the case where more than one parallel
++# process may require the user's attention. The default is iterate over the available
++# terminal types to find one that works.
++#
++# Examples of the occasions this may happen are when resolving patches which cannot
++# be applied, to use the devshell or the kernel menuconfig
++#
++# Supported values are auto, gnome, xfce, rxvt, screen, konsole (KDE 3.x only), none
++# Note: currently, Konsole support only works for KDE 3.x due to the way
++# newer Konsole versions behave
++#OE_TERMINAL = "auto"
++# By default disable interactive patch resolution (tasks will just fail instead):
++PATCHRESOLVE = "noop"
++
++#
++# Disk Space Monitoring during the build
++#
++# Monitor the disk space during the build. If there is less that 1GB of space or less
++# than 100K inodes in any key build location (TMPDIR, DL_DIR, SSTATE_DIR), gracefully
++# shutdown the build. If there is less that 100MB or 1K inodes, perform a hard abort
++# of the build. The reason for this is that running completely out of space can corrupt
++# files and damages the build in ways which may not be easily recoverable.
++# It's necessary to monitor /tmp, if there is no space left the build will fail
++# with very exotic errors.
++BB_DISKMON_DIRS = "\
++    STOPTASKS,${TMPDIR},1G,100K \
++    STOPTASKS,${DL_DIR},1G,100K \
++    STOPTASKS,${SSTATE_DIR},1G,100K \
++    STOPTASKS,/tmp,100M,100K \
++    ABORT,${TMPDIR},100M,1K \
++    ABORT,${DL_DIR},100M,1K \
++    ABORT,${SSTATE_DIR},100M,1K \
++    ABORT,/tmp,10M,1K"
++
++#
++# Shared-state files from other locations
++#
++# As mentioned above, shared state files are prebuilt cache data objects which can
++# used to accelerate build time. This variable can be used to configure the system
++# to search other mirror locations for these objects before it builds the data itself.
++#
++# This can be a filesystem directory, or a remote url such as http or ftp. These
++# would contain the sstate-cache results from previous builds (possibly from other
++# machines). This variable works like fetcher MIRRORS/PREMIRRORS and points to the
++# cache locations to check for the shared objects.
++# NOTE: if the mirror uses the same structure as SSTATE_DIR, you need to add PATH
++# at the end as shown in the examples below. This will be substituted with the
++# correct path within the directory structure.
++#SSTATE_MIRRORS ?= "\
++#file://.* http://someserver.tld/share/sstate/PATH;downloadfilename=PATH \n \
++#file://.* file:///some/local/dir/sstate/PATH"
++
++#
++# Qemu configuration
++#
++# By default qemu will build with a builtin VNC server where graphical output can be
++# seen. The two lines below enable the SDL backend too. This assumes there is a
++# libsdl library available on your build system.
++PACKAGECONFIG_append_pn-qemu-native = " sdl"
++PACKAGECONFIG_append_pn-nativesdk-qemu = " sdl"
++#ASSUME_PROVIDED += "libsdl-native"
++
++# CONF_VERSION is increased each time build/conf/ changes incompatibly and is used to
++# track the version of this file when it was generated. This can safely be ignored if
++# this doesn't mean anything to you.
++CONF_VERSION = "1"
++
++# Set the root password to '0penBmc'
++INHERIT += "extrausers"
++EXTRA_USERS_PARAMS = " \
++  usermod -p '\$1\$UGMqyqdG\$FZiylVFmRRfl9Z0Ue8G7e/' root; \
++  "
+diff --git a/meta-inspur/meta-openrmc/conf/machine/openrmc.conf b/meta-inspur/meta-openrmc/conf/machine/openrmc.conf
+new file mode 100644
+index 000000000..a420b6599
+--- /dev/null
++++ b/meta-inspur/meta-openrmc/conf/machine/openrmc.conf
+@@ -0,0 +1,12 @@
++KMACHINE = "aspeed"
++KERNEL_DEVICETREE = "${KMACHINE}-bmc-inspur-openrmc.dtb"
++
++require conf/machine/include/ast2500.inc
++require conf/machine/include/obmc-bsp-common.inc
++require conf/machine/include/inspur.inc
++
++UBOOT_MACHINE = "ast_g5_phy_config"
++
++FLASH_SIZE = "32768"
++
++VIRTUAL-RUNTIME_skeleton_workbook = "${MACHINE}-config"
+diff --git a/meta-inspur/meta-openrmc/recipes-phosphor/bmcweb/bmcweb_%.bbappend b/meta-inspur/meta-openrmc/recipes-phosphor/bmcweb/bmcweb_%.bbappend
+new file mode 100644
+index 000000000..c14c2599f
+--- /dev/null
++++ b/meta-inspur/meta-openrmc/recipes-phosphor/bmcweb/bmcweb_%.bbappend
+@@ -0,0 +1,6 @@
++FILESEXTRAPATHS_prepend := "${THISDIR}/${PN}:"
++
++SRC_URI = "git://github.com/inspur-bmc/rmcweb;protocol=https;branch=rmcweb"
++SRCREV = "ec8ce2a09b851ff5da59b0b9faba5c035c5e0faf"
++
++EXTRA_OECMAKE += "-DDBMCWEB_ENABLE_REDFISH_RMC=ON"
+diff --git a/meta-inspur/meta-openrmc/recipes-phosphor/sensors/phosphor-hwmon/obmc/hwmon/ahb/apb/bus@1e78a000/i2c-bus@1c0/tmp112@48.conf b/meta-inspur/meta-openrmc/recipes-phosphor/sensors/phosphor-hwmon/obmc/hwmon/ahb/apb/bus@1e78a000/i2c-bus@1c0/tmp112@48.conf
+new file mode 100644
+index 000000000..eebfaedf5
+--- /dev/null
++++ b/meta-inspur/meta-openrmc/recipes-phosphor/sensors/phosphor-hwmon/obmc/hwmon/ahb/apb/bus@1e78a000/i2c-bus@1c0/tmp112@48.conf
+@@ -0,0 +1,5 @@
++LABEL_temp1 = "inlet"
++WARNHI_temp1 = "60000"
++WARNLO_temp1 = "0"
++CRITHI_temp1 = "70000"
++CRITLO_temp1 = "0"
+diff --git a/meta-inspur/meta-openrmc/recipes-phosphor/sensors/phosphor-hwmon/obmc/hwmon/ahb/apb/bus@1e78a000/i2c-bus@1c0/tmp421@4e.conf b/meta-inspur/meta-openrmc/recipes-phosphor/sensors/phosphor-hwmon/obmc/hwmon/ahb/apb/bus@1e78a000/i2c-bus@1c0/tmp421@4e.conf
+new file mode 100644
+index 000000000..f2bf06d5b
+--- /dev/null
++++ b/meta-inspur/meta-openrmc/recipes-phosphor/sensors/phosphor-hwmon/obmc/hwmon/ahb/apb/bus@1e78a000/i2c-bus@1c0/tmp421@4e.conf
+@@ -0,0 +1,7 @@
++LABEL_temp1 = "outlet"
++CRITLO_temp1 = "0"
++CRITHI_temp1 = "100000"
++
++LABEL_temp2 = "outlet2"
++CRITLO_temp2 = "0"
++CRITHI_temp2 = "100000"
+diff --git a/meta-inspur/meta-openrmc/recipes-phosphor/sensors/phosphor-hwmon/obmc/hwmon/ahb/apb/bus@1e78a000/i2c-bus@300/adm1278@11.conf b/meta-inspur/meta-openrmc/recipes-phosphor/sensors/phosphor-hwmon/obmc/hwmon/ahb/apb/bus@1e78a000/i2c-bus@300/adm1278@11.conf
+new file mode 100644
+index 000000000..b6da9d7cd
+--- /dev/null
++++ b/meta-inspur/meta-openrmc/recipes-phosphor/sensors/phosphor-hwmon/obmc/hwmon/ahb/apb/bus@1e78a000/i2c-bus@300/adm1278@11.conf
+@@ -0,0 +1,4 @@
++LABEL_in1 = "vin"
++LABEL_in2 = "vout"
++LABEL_curr1 = "iout1"
++LABEL_power1 = "pin"
+diff --git a/meta-inspur/meta-openrmc/recipes-phosphor/sensors/phosphor-hwmon/obmc/hwmon/ahb/apb/pwm-tacho-controller@1e786000.conf b/meta-inspur/meta-openrmc/recipes-phosphor/sensors/phosphor-hwmon/obmc/hwmon/ahb/apb/pwm-tacho-controller@1e786000.conf
+new file mode 100644
+index 000000000..1523539bd
+--- /dev/null
++++ b/meta-inspur/meta-openrmc/recipes-phosphor/sensors/phosphor-hwmon/obmc/hwmon/ahb/apb/pwm-tacho-controller@1e786000.conf
+@@ -0,0 +1,9 @@
++LABEL_fan1 = "fan0"
++LABEL_fan2 = "fan1"
++LABEL_fan3 = "fan2"
++LABEL_fan4 = "fan3"
++
++PWM_TARGET_fan1 = "1"
++PWM_TARGET_fan2 = "1"
++PWM_TARGET_fan3 = "2"
++PWM_TARGET_fan4 = "2"
+diff --git a/meta-inspur/meta-openrmc/recipes-phosphor/sensors/phosphor-hwmon/obmc/hwmon/iio-hwmon.conf b/meta-inspur/meta-openrmc/recipes-phosphor/sensors/phosphor-hwmon/obmc/hwmon/iio-hwmon.conf
+new file mode 100644
+index 000000000..fba435e94
+--- /dev/null
++++ b/meta-inspur/meta-openrmc/recipes-phosphor/sensors/phosphor-hwmon/obmc/hwmon/iio-hwmon.conf
+@@ -0,0 +1,8 @@
++LABEL_in1="P3V3"
++GAIN_in1 = 2.0
++LABEL_in2="P5V"
++GAIN_in2 = 3.7
++LABEL_in3="P12V_STBY"
++GAIN_in3 = 9.2
++LABEL_in4="P1V05"
++LABEL_in5="PVNN"
+diff --git a/meta-inspur/meta-openrmc/recipes-phosphor/sensors/phosphor-hwmon_%.bbappend b/meta-inspur/meta-openrmc/recipes-phosphor/sensors/phosphor-hwmon_%.bbappend
+new file mode 100644
+index 000000000..67c92a46b
+--- /dev/null
++++ b/meta-inspur/meta-openrmc/recipes-phosphor/sensors/phosphor-hwmon_%.bbappend
+@@ -0,0 +1,19 @@
++FILESEXTRAPATHS_prepend := "${THISDIR}/${PN}:"
++
++EXTRA_OECONF_append_openrmc= " --enable-negative-errno-on-fail"
++
++CHIPS = " \
++        bus@1e78a000/i2c-bus@1c0/tmp112@48 \
++        bus@1e78a000/i2c-bus@1c0/tmp421@4e \
++        bus@1e78a000/i2c-bus@300/adm1278@11 \
++        pwm-tacho-controller@1e786000 \
++        "
++ITEMSFMT = "ahb/apb/{0}.conf"
++
++ITEMS = "${@compose_list(d, 'ITEMSFMT', 'CHIPS')}"
++
++ITEMS += "iio-hwmon.conf"
++
++
++ENVS = "obmc/hwmon/{0}"
++SYSTEMD_ENVIRONMENT_FILE_${PN} += "${@compose_list(d, 'ENVS', 'ITEMS')}"
+diff --git a/meta-inspur/meta-openrmc/recipes-phosphor/skeleton/obmc-libobmc-intf/gpio_defs.json b/meta-inspur/meta-openrmc/recipes-phosphor/skeleton/obmc-libobmc-intf/gpio_defs.json
+new file mode 100644
+index 000000000..b02709ec2
+--- /dev/null
++++ b/meta-inspur/meta-openrmc/recipes-phosphor/skeleton/obmc-libobmc-intf/gpio_defs.json
+@@ -0,0 +1,47 @@
++{
++    "gpio_configs": {
++
++        "power_config": {
++            "power_good_in": "PGOOD",
++            "power_up_outs": [
++                {"name": "POWER_UP_PIN", "polarity": true}
++            ],
++            "reset_outs": [
++                {"name": "RESET_OUT", "polarity": false}
++            ]
++        }
++    },
++
++    "gpio_definitions": [
++        {
++            "name": "PGOOD",
++            "pin": "AB3",
++            "direction": "in"
++        },
++        {
++            "name": "POWER_BUTTON",
++            "pin": "E2",
++            "direction": "both"
++        },
++        {
++            "name": "POWER_UP_PIN",
++            "pin": "E3",
++            "direction": "out"
++        },
++        {
++            "name": "RESET_BUTTON",
++            "pin": "E0",
++            "direction": "both"
++        },
++        {
++            "name": "RESET_OUT",
++            "pin": "E1",
++            "direction": "out"
++        },
++        {
++            "name": "ID_BUTTON",
++            "pin": "S6",
++            "direction": "both"
++        }
++    ]
++}
+diff --git a/meta-inspur/meta-openrmc/recipes-phosphor/skeleton/obmc-libobmc-intf_%.bbappend b/meta-inspur/meta-openrmc/recipes-phosphor/skeleton/obmc-libobmc-intf_%.bbappend
+new file mode 100644
+index 000000000..72d991c7e
+--- /dev/null
++++ b/meta-inspur/meta-openrmc/recipes-phosphor/skeleton/obmc-libobmc-intf_%.bbappend
+@@ -0,0 +1 @@
++FILESEXTRAPATHS_prepend := "${THISDIR}/${PN}:"
+diff --git a/meta-inspur/meta-openrmc/recipes-phosphor/webui/phosphor-webui_%.bbappend b/meta-inspur/meta-openrmc/recipes-phosphor/webui/phosphor-webui_%.bbappend
+new file mode 100644
+index 000000000..f24c0a621
+--- /dev/null
++++ b/meta-inspur/meta-openrmc/recipes-phosphor/webui/phosphor-webui_%.bbappend
+@@ -0,0 +1,4 @@
++FILESEXTRAPATHS_prepend := "${THISDIR}/${PN}:"
++
++SRC_URI = "git://github.com/inspur-bmc/OR-web;protocol=https"
++SRCREV = "01f344122eabed24ba70e6740526ae7cb4f22cdb"
+diff --git a/meta-inspur/meta-openrmc/recipes-phosphor/workbook/openrmc-config.bb b/meta-inspur/meta-openrmc/recipes-phosphor/workbook/openrmc-config.bb
+new file mode 100644
+index 000000000..64b9c644e
+--- /dev/null
++++ b/meta-inspur/meta-openrmc/recipes-phosphor/workbook/openrmc-config.bb
+@@ -0,0 +1,38 @@
++SUMMARY = "Inspur OpenRmc board wiring"
++DESCRIPTION = "Board wiring information for the On5263 system."
++PR = "r1"
++LICENSE = "Apache-2.0"
++LIC_FILES_CHKSUM = "file://${INSPURBASE}/COPYING.apache-2.0;md5=34400b68072d710fecd0a2940a0d1658"
++
++inherit allarch
++inherit setuptools
++inherit pythonnative
++
++PROVIDES += "virtual/obmc-inventory-data"
++RPROVIDES_${PN} += "virtual-obmc-inventory-data"
++
++DEPENDS += "python"
++
++S = "${WORKDIR}"
++SRC_URI += "file://Openrmc.py"
++
++# the following is unnecessary.
++python() {
++        machine = d.getVar('MACHINE', True).capitalize() + '.py'
++        d.setVar('_config_in_skeleton', machine)
++}
++
++do_make_setup() {
++        cp ${S}/${_config_in_skeleton} \
++                ${S}/obmc_system_config.py
++        cat <<EOF > ${S}/setup.py
++from distutils.core import setup
++
++setup(name='${BPN}',
++    version='${PR}',
++    py_modules=['obmc_system_config'],
++    )
++EOF
++}
++
++addtask make_setup after do_patch before do_configure
+diff --git a/meta-inspur/meta-openrmc/recipes-phosphor/workbook/openrmc-config/Openrmc.py b/meta-inspur/meta-openrmc/recipes-phosphor/workbook/openrmc-config/Openrmc.py
+new file mode 100644
+index 000000000..ca7cb2098
+--- /dev/null
++++ b/meta-inspur/meta-openrmc/recipes-phosphor/workbook/openrmc-config/Openrmc.py
+@@ -0,0 +1,48 @@
++## System states
++##   state can change to next state in 2 ways:
++##   - a process emits a GotoSystemState signal with state name to goto
++##   - objects specified in EXIT_STATE_DEPEND have started
++SYSTEM_STATES = [
++    'BASE_APPS',
++    'BMC_STARTING',
++    'BMC_READY',
++    'HOST_POWERING_ON',
++    'HOST_POWERED_ON',
++    'HOST_BOOTING',
++    'HOST_BOOTED',
++    'HOST_POWERED_OFF',
++]
++
++EXIT_STATE_DEPEND = {
++    'BASE_APPS' : {
++        '/xyz/openbmc_poroject/sensors': 0,
++    },
++    'BMC_STARTING' : {
++        '/xyz/openbmc_project/control/chassis0': 0,
++    },
++}
++
++FRU_INSTANCES = {}
++
++# I believe these numbers need to match the yaml file used to create the c++ ipmi map.
++# the devices have types, but I don't believe that factors in here, I think these are
++# just unique IDs.
++ID_LOOKUP = {
++    'FRU' : {},
++    # The number at the end needs to match the FRU ID.
++    # https://github.com/openbmc/skeleton/blob/master/pysystemmgr/system_manager.py#L143
++    # The parameter for it is of type 'y' (unsigned 8-bit integer) presumably decimal?
++    'FRU_STR' : {},
++    'SENSOR' : {},
++    'GPIO_PRESENT' : {}
++}
++
++GPIO_CONFIG = {}
++HWMON_CONFIG = {}
++GPIO_CONFIGS = {}
++
++# Miscellaneous non-poll sensor with system specific properties.
++# The sensor id is the same as those defined in ID_LOOKUP['SENSOR'].
++MISC_SENSORS = {}
++
++# vim: tabstop=8 expandtab shiftwidth=4 softtabstop=4
+-- 
+2.17.1
+

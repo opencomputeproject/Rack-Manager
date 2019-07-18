@@ -1,0 +1,4654 @@
+From b0faa79961d57ce7a28fe61571ac7ebb89d19b50 Mon Sep 17 00:00:00 2001
+From: John Wang <wangzqbj@inspur.com>
+Date: Tue, 5 Mar 2019 15:34:38 +0800
+Subject: [PATCH 2/4] Implement the rmc redfish interface with fake-data
+
+Signed-off-by: John Wang <wangzqbj@inspur.com>
+---
+ redfish-core/include/rmc_redfish.hpp      |   86 ++
+ redfish-core/lib/rmc_chassis.hpp          |  152 ++
+ redfish-core/lib/rmc_ethernet.hpp         | 1717 +++++++++++++++++++++
+ redfish-core/lib/rmc_log_services.hpp     | 1338 ++++++++++++++++
+ redfish-core/lib/rmc_managers.hpp         |  217 +++
+ redfish-core/lib/rmc_network_protocol.hpp |  221 +++
+ redfish-core/lib/rmc_power.hpp            |  153 ++
+ redfish-core/lib/rmc_systems.hpp          |  406 +++++
+ redfish-core/lib/rmc_thermal.hpp          |  125 ++
+ redfish-core/lib/rmc_update_service.hpp   |  147 ++
+ 10 files changed, 4562 insertions(+)
+ create mode 100644 redfish-core/include/rmc_redfish.hpp
+ create mode 100644 redfish-core/lib/rmc_chassis.hpp
+ create mode 100644 redfish-core/lib/rmc_ethernet.hpp
+ create mode 100644 redfish-core/lib/rmc_log_services.hpp
+ create mode 100644 redfish-core/lib/rmc_managers.hpp
+ create mode 100644 redfish-core/lib/rmc_network_protocol.hpp
+ create mode 100644 redfish-core/lib/rmc_power.hpp
+ create mode 100644 redfish-core/lib/rmc_systems.hpp
+ create mode 100644 redfish-core/lib/rmc_thermal.hpp
+ create mode 100644 redfish-core/lib/rmc_update_service.hpp
+
+diff --git a/redfish-core/include/rmc_redfish.hpp b/redfish-core/include/rmc_redfish.hpp
+new file mode 100644
+index 0000000..8d857c4
+--- /dev/null
++++ b/redfish-core/include/rmc_redfish.hpp
+@@ -0,0 +1,86 @@
++/*
++// Copyright (c) 2018 Intel Corporation
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++*/
++#pragma once
++
++#include "../lib/account_service.hpp"
++#include "../lib/redfish_sessions.hpp"
++#include "../lib/rmc_chassis.hpp"
++#include "../lib/rmc_ethernet.hpp"
++#include "../lib/rmc_managers.hpp"
++#include "../lib/rmc_network_protocol.hpp"
++#include "../lib/rmc_power.hpp"
++#include "../lib/rmc_systems.hpp"
++#include "../lib/rmc_thermal.hpp"
++#include "../lib/rmc_update_service.hpp"
++#include "../lib/roles.hpp"
++#include "../lib/service_root.hpp"
++#include "webserver_common.hpp"
++
++namespace redfish
++{
++/*
++ * @brief Top level class installing and providing Redfish services
++ */
++class RmcRedfishService
++{
++  public:
++    /*
++     * @brief Redfish service constructor
++     *
++     * Loads Redfish configuration and installs schema resources
++     *
++     * @param[in] app   Crow app on which Redfish will initialize
++     */
++    RmcRedfishService(CrowApp& app)
++    {
++        nodes.emplace_back(std::make_unique<AccountService>(app));
++        nodes.emplace_back(std::make_unique<AccountsCollection>(app));
++        nodes.emplace_back(std::make_unique<ManagerAccount>(app));
++        nodes.emplace_back(std::make_unique<SessionCollection>(app));
++        nodes.emplace_back(std::make_unique<Roles>(app));
++        nodes.emplace_back(std::make_unique<RoleCollection>(app));
++        nodes.emplace_back(std::make_unique<ServiceRoot>(app));
++        nodes.emplace_back(std::make_unique<SessionService>(app));
++        nodes.emplace_back(std::make_unique<NetworkProtocol>(app));
++        nodes.emplace_back(std::make_unique<VlanNetworkInterface>(app));
++        nodes.emplace_back(
++            std::make_unique<VlanNetworkInterfaceCollection>(app));
++        nodes.emplace_back(std::make_unique<EthernetCollection>(app));
++        nodes.emplace_back(std::make_unique<EthernetInterface>(app));
++        nodes.emplace_back(std::make_unique<ChassisCollection>(app));
++        nodes.emplace_back(std::make_unique<Chassis>(app));
++        nodes.emplace_back(std::make_unique<Thermal>(app));
++        nodes.emplace_back(std::make_unique<Power>(app));
++        nodes.emplace_back(std::make_unique<ManagerActionsReset>(app));
++        nodes.emplace_back(std::make_unique<Manager>(app));
++        nodes.emplace_back(std::make_unique<ManagerCollection>(app));
++        nodes.emplace_back(std::make_unique<UpdateService>(app));
++        nodes.emplace_back(std::make_unique<SoftwareInventoryCollection>(app));
++        nodes.emplace_back(std::make_unique<SoftwareInventory>(app));
++        nodes.emplace_back(std::make_unique<SystemsCollection>(app));
++        nodes.emplace_back(std::make_unique<SystemActionsReset>(app));
++        nodes.emplace_back(std::make_unique<Systems>(app));
++        nodes.emplace_back(std::make_unique<ProcessorCollection>(app));
++        nodes.emplace_back(std::make_unique<MemoryCollection>(app));
++        nodes.emplace_back(std::make_unique<Processor>(app));
++        nodes.emplace_back(std::make_unique<Memory>(app));
++    }
++
++  private:
++    std::vector<std::unique_ptr<Node>> nodes;
++};
++
++} // namespace redfish
+diff --git a/redfish-core/lib/rmc_chassis.hpp b/redfish-core/lib/rmc_chassis.hpp
+new file mode 100644
+index 0000000..7f0bfbe
+--- /dev/null
++++ b/redfish-core/lib/rmc_chassis.hpp
+@@ -0,0 +1,152 @@
++/*
++// Copyright (c) 2018 Intel Corporation
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++*/
++#pragma once
++
++#include "node.hpp"
++
++#include <boost/container/flat_map.hpp>
++
++namespace redfish
++{
++
++class ChassisCollection : public Node
++{
++  public:
++    ChassisCollection(CrowApp &app) : Node(app, "/redfish/v1/Chassis/")
++    {
++        entityPrivileges = {
++            {boost::beast::http::verb::get, {{"Login"}}},
++            {boost::beast::http::verb::head, {{"Login"}}},
++            {boost::beast::http::verb::patch, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::put, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::delete_, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::post, {{"ConfigureComponents"}}}};
++    }
++
++  private:
++    void getChassisList(std::shared_ptr<AsyncResp> asyncResp)
++    {
++        nlohmann::json &chassisArray = asyncResp->res.jsonValue["Members"];
++        chassisArray = nlohmann::json::array();
++        chassisArray.push_back({{"@odata.id", "/redfish/v1/Chassis/chassis1"}});
++        chassisArray.push_back({{"@odata.id", "/redfish/v1/Chassis/chassis2"}});
++        chassisArray.push_back({{"@odata.id", "/redfish/v1/Chassis/chassis3"}});
++        asyncResp->res.jsonValue["Members@odata.count"] = chassisArray.size();
++    }
++
++    void doGet(crow::Response &res, const crow::Request &req,
++               const std::vector<std::string> &params) override
++    {
++        BMCWEB_LOG_ERROR << "doGet in chassis collectoin";
++        res.jsonValue["@odata.type"] = "#ChassisCollection.ChassisCollection";
++        res.jsonValue["@odata.id"] = "/redfish/v1/Chassis";
++        res.jsonValue["@odata.context"] =
++            "/redfish/v1/$metadata#ChassisCollection.ChassisCollection";
++        res.jsonValue["Name"] = "Chassis Collection";
++        auto asyncResp = std::make_shared<AsyncResp>(res);
++        getChassisList(asyncResp);
++    }
++};
++
++/**
++ * Chassis override class for delivering Chassis Schema
++ */
++class Chassis : public Node
++{
++  public:
++    Chassis(CrowApp &app) :
++        Node(app, "/redfish/v1/Chassis/<str>/", std::string())
++    {
++        entityPrivileges = {
++            {boost::beast::http::verb::get, {{"Login"}}},
++            {boost::beast::http::verb::head, {{"Login"}}},
++            {boost::beast::http::verb::patch, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::put, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::delete_, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::post, {{"ConfigureComponents"}}}};
++    }
++
++  private:
++    void getChassis(std::shared_ptr<AsyncResp> asyncResp,
++                    const std::string &chassisId)
++    {
++
++        asyncResp->res.jsonValue["Name"] = chassisId;
++        asyncResp->res.jsonValue["Id"] = chassisId;
++        asyncResp->res.jsonValue["Thermal"] = {
++            {"@odata.id", "/redfish/v1/Chassis/" + chassisId + "/Thermal"}};
++        asyncResp->res.jsonValue["Power"] = {
++            {"@odata.id", "/redfish/v1/Chassis/" + chassisId + "/Power"}};
++    }
++
++    void doGet(crow::Response &res, const crow::Request &req,
++               const std::vector<std::string> &params) override
++    {
++        // Check if there is required param, truly entering this shall be
++        // impossible.
++        if (params.size() != 1)
++        {
++            messages::internalError(res);
++            res.end();
++            return;
++        }
++
++        const std::string &chassisId = params[0];
++        std::string ipaddr = "192.168.1.100";
++        if (chassisId == "chassis1")
++            ipaddr = "192.168.1.101";
++        else if (chassisId == "chassis2")
++            ipaddr = "192.168.1.102";
++        else if (chassisId == "chassis3")
++            ipaddr = "192.168.1.103";
++
++        res.jsonValue["@odata.type"] = "#Chassis.v1_4_0.Chassis";
++        res.jsonValue["@odata.id"] =
++            std::string("/redfish/v1/Chassis/") + chassisId;
++        res.jsonValue["@odata.context"] =
++            "/redfish/v1/$metadata#Chassis.Chassis";
++        res.jsonValue["Description"] = "Ocp Node";
++        res.jsonValue["Manufacturer"] = "Inspur";
++        res.jsonValue["Model"] = "OCP";
++        res.jsonValue["SKU"] = "2810-9827-5523-1435";
++        res.jsonValue["SerialNumber"] = "EE1D253";
++        res.jsonValue["PartNumber"] = "NF1750";
++        res.jsonValue["IpAddr"] = ipaddr;
++        res.jsonValue["AssetTag"] = {};
++        res.jsonValue["IndicatorLED"] = {};
++        res.jsonValue["PowerState"] = "On";
++        res.jsonValue["ChassisType"] = "Rack";
++        nlohmann::json &status = res.jsonValue["Status"];
++        status["State"] = "Enabled";
++        status["Health"] = "OK";
++        status["HealthRollup"] = {};
++
++        res.jsonValue["Links"] = {};
++        res.jsonValue["ContainedBy"] = {};
++        res.jsonValue["ComputerSystems"] = {};
++        res.jsonValue["ManagedBy"] = {
++            {"@odata.id", "/redfish/v1/Managers/rmc"}};
++        res.jsonValue["ManagersInChassis"] = {};
++        res.jsonValue["PoweredBy"] = {};
++        res.jsonValue["CooledBy"] = {};
++        res.jsonValue["Storage"] = {};
++        res.jsonValue["Drives"] = {};
++
++        auto asyncResp = std::make_shared<AsyncResp>(res);
++        getChassis(asyncResp, chassisId);
++    }
++};
++} // namespace redfish
+diff --git a/redfish-core/lib/rmc_ethernet.hpp b/redfish-core/lib/rmc_ethernet.hpp
+new file mode 100644
+index 0000000..554d830
+--- /dev/null
++++ b/redfish-core/lib/rmc_ethernet.hpp
+@@ -0,0 +1,1717 @@
++/*
++// Copyright (c) 2018 Intel Corporation
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++*/
++#pragma once
++
++#include <boost/container/flat_map.hpp>
++#include <boost/container/flat_set.hpp>
++#include <dbus_singleton.hpp>
++#include <error_messages.hpp>
++#include <node.hpp>
++#include <optional>
++#include <utils/json_utils.hpp>
++#include <variant>
++
++namespace redfish
++{
++
++/**
++ * DBus types primitives for several generic DBus interfaces
++ * TODO(Pawel) consider move this to separate file into boost::dbus
++ */
++using PropertiesMapType = boost::container::flat_map<
++    std::string, std::variant<std::string, bool, uint8_t, int16_t, uint16_t,
++                              int32_t, uint32_t, int64_t, uint64_t, double>>;
++
++using GetManagedObjects = std::vector<std::pair<
++    sdbusplus::message::object_path,
++    std::vector<std::pair<
++        std::string,
++        boost::container::flat_map<
++            std::string, sdbusplus::message::variant<
++                             std::string, bool, uint8_t, int16_t, uint16_t,
++                             int32_t, uint32_t, int64_t, uint64_t, double,
++                             std::vector<std::string>>>>>>>;
++
++enum class LinkType
++{
++    Local,
++    Global
++};
++
++/**
++ * Structure for keeping IPv4 data required by Redfish
++ */
++struct IPv4AddressData
++{
++    std::string id;
++    std::string address;
++    std::string domain;
++    std::string gateway;
++    std::string netmask;
++    std::string origin;
++    LinkType linktype;
++
++    bool operator<(const IPv4AddressData &obj) const
++    {
++        return id < obj.id;
++    }
++};
++
++/**
++ * Structure for keeping basic single Ethernet Interface information
++ * available from DBus
++ */
++struct EthernetInterfaceData
++{
++    uint32_t speed;
++    bool auto_neg;
++    std::string hostname;
++    std::string default_gateway;
++    std::string mac_address;
++    std::optional<uint32_t> vlan_id;
++    std::vector<std::string> nameservers;
++};
++
++// Helper function that changes bits netmask notation (i.e. /24)
++// into full dot notation
++inline std::string getNetmask(unsigned int bits)
++{
++    uint32_t value = 0xffffffff << (32 - bits);
++    std::string netmask = std::to_string((value >> 24) & 0xff) + "." +
++                          std::to_string((value >> 16) & 0xff) + "." +
++                          std::to_string((value >> 8) & 0xff) + "." +
++                          std::to_string(value & 0xff);
++    return netmask;
++}
++
++inline std::string
++    translateAddressOriginDbusToRedfish(const std::string &inputOrigin,
++                                        bool isIPv4)
++{
++    if (inputOrigin == "xyz.openbmc_project.Network.IP.AddressOrigin.Static")
++    {
++        return "Static";
++    }
++    if (inputOrigin == "xyz.openbmc_project.Network.IP.AddressOrigin.LinkLocal")
++    {
++        if (isIPv4)
++        {
++            return "IPv4LinkLocal";
++        }
++        else
++        {
++            return "LinkLocal";
++        }
++    }
++    if (inputOrigin == "xyz.openbmc_project.Network.IP.AddressOrigin.DHCP")
++    {
++        if (isIPv4)
++        {
++            return "DHCP";
++        }
++        else
++        {
++            return "DHCPv6";
++        }
++    }
++    if (inputOrigin == "xyz.openbmc_project.Network.IP.AddressOrigin.SLAAC")
++    {
++        return "SLAAC";
++    }
++    return "";
++}
++
++inline std::string
++    translateAddressOriginRedfishToDbus(const std::string &inputOrigin)
++{
++    if (inputOrigin == "Static")
++    {
++        return "xyz.openbmc_project.Network.IP.AddressOrigin.Static";
++    }
++    if (inputOrigin == "DHCP" || inputOrigin == "DHCPv6")
++    {
++        return "xyz.openbmc_project.Network.IP.AddressOrigin.DHCP";
++    }
++    if (inputOrigin == "IPv4LinkLocal" || inputOrigin == "LinkLocal")
++    {
++        return "xyz.openbmc_project.Network.IP.AddressOrigin.LinkLocal";
++    }
++    if (inputOrigin == "SLAAC")
++    {
++        return "xyz.openbmc_project.Network.IP.AddressOrigin.SLAAC";
++    }
++    return "";
++}
++
++inline void extractEthernetInterfaceData(const std::string &ethiface_id,
++                                         const GetManagedObjects &dbus_data,
++                                         EthernetInterfaceData &ethData)
++{
++    for (const auto &objpath : dbus_data)
++    {
++        for (const auto &ifacePair : objpath.second)
++        {
++            if (objpath.first == "/xyz/openbmc_project/network/" + ethiface_id)
++            {
++                if (ifacePair.first == "xyz.openbmc_project.Network.MACAddress")
++                {
++                    for (const auto &propertyPair : ifacePair.second)
++                    {
++                        if (propertyPair.first == "MACAddress")
++                        {
++                            const std::string *mac =
++                                std::get_if<std::string>(&propertyPair.second);
++                            if (mac != nullptr)
++                            {
++                                ethData.mac_address = *mac;
++                            }
++                        }
++                    }
++                }
++                else if (ifacePair.first == "xyz.openbmc_project.Network.VLAN")
++                {
++                    for (const auto &propertyPair : ifacePair.second)
++                    {
++                        if (propertyPair.first == "Id")
++                        {
++                            const uint32_t *id =
++                                std::get_if<uint32_t>(&propertyPair.second);
++                            if (id != nullptr)
++                            {
++                                ethData.vlan_id = *id;
++                            }
++                        }
++                    }
++                }
++                else if (ifacePair.first ==
++                         "xyz.openbmc_project.Network.EthernetInterface")
++                {
++                    for (const auto &propertyPair : ifacePair.second)
++                    {
++                        if (propertyPair.first == "AutoNeg")
++                        {
++                            const bool *auto_neg =
++                                std::get_if<bool>(&propertyPair.second);
++                            if (auto_neg != nullptr)
++                            {
++                                ethData.auto_neg = *auto_neg;
++                            }
++                        }
++                        else if (propertyPair.first == "Speed")
++                        {
++                            const uint32_t *speed =
++                                std::get_if<uint32_t>(&propertyPair.second);
++                            if (speed != nullptr)
++                            {
++                                ethData.speed = *speed;
++                            }
++                        }
++                        else if (propertyPair.first == "NameServers")
++                        {
++                            const std::vector<std::string> *nameservers =
++                                sdbusplus::message::variant_ns::get_if<
++                                    std::vector<std::string>>(
++                                    &propertyPair.second);
++                            if (nameservers != nullptr)
++                            {
++                                ethData.nameservers = std::move(*nameservers);
++                            }
++                        }
++                    }
++                }
++            }
++            // System configuration shows up in the global namespace, so no need
++            // to check eth number
++            if (ifacePair.first ==
++                "xyz.openbmc_project.Network.SystemConfiguration")
++            {
++                for (const auto &propertyPair : ifacePair.second)
++                {
++                    if (propertyPair.first == "HostName")
++                    {
++                        const std::string *hostname =
++                            sdbusplus::message::variant_ns::get_if<std::string>(
++                                &propertyPair.second);
++                        if (hostname != nullptr)
++                        {
++                            ethData.hostname = *hostname;
++                        }
++                    }
++                    else if (propertyPair.first == "DefaultGateway")
++                    {
++                        const std::string *defaultGateway =
++                            sdbusplus::message::variant_ns::get_if<std::string>(
++                                &propertyPair.second);
++                        if (defaultGateway != nullptr)
++                        {
++                            ethData.default_gateway = *defaultGateway;
++                        }
++                    }
++                }
++            }
++        }
++    }
++}
++
++// Helper function that extracts data for single ethernet ipv4 address
++inline void
++    extractIPData(const std::string &ethiface_id,
++                  const GetManagedObjects &dbus_data,
++                  boost::container::flat_set<IPv4AddressData> &ipv4_config)
++{
++    const std::string ipv4PathStart =
++        "/xyz/openbmc_project/network/" + ethiface_id + "/ipv4/";
++
++    // Since there might be several IPv4 configurations aligned with
++    // single ethernet interface, loop over all of them
++    for (const auto &objpath : dbus_data)
++    {
++        // Check if proper pattern for object path appears
++        if (boost::starts_with(objpath.first.str, ipv4PathStart))
++        {
++            for (auto &interface : objpath.second)
++            {
++                if (interface.first == "xyz.openbmc_project.Network.IP")
++                {
++                    // Instance IPv4AddressData structure, and set as
++                    // appropriate
++                    std::pair<
++                        boost::container::flat_set<IPv4AddressData>::iterator,
++                        bool>
++                        it = ipv4_config.insert(
++                            {objpath.first.str.substr(ipv4PathStart.size())});
++                    IPv4AddressData &ipv4_address = *it.first;
++                    for (auto &property : interface.second)
++                    {
++                        if (property.first == "Address")
++                        {
++                            const std::string *address =
++                                std::get_if<std::string>(&property.second);
++                            if (address != nullptr)
++                            {
++                                ipv4_address.address = *address;
++                            }
++                        }
++                        else if (property.first == "Gateway")
++                        {
++                            const std::string *gateway =
++                                std::get_if<std::string>(&property.second);
++                            if (gateway != nullptr)
++                            {
++                                ipv4_address.gateway = *gateway;
++                            }
++                        }
++                        else if (property.first == "Origin")
++                        {
++                            const std::string *origin =
++                                std::get_if<std::string>(&property.second);
++                            if (origin != nullptr)
++                            {
++                                ipv4_address.origin =
++                                    translateAddressOriginDbusToRedfish(*origin,
++                                                                        true);
++                            }
++                        }
++                        else if (property.first == "PrefixLength")
++                        {
++                            const uint8_t *mask =
++                                std::get_if<uint8_t>(&property.second);
++                            if (mask != nullptr)
++                            {
++                                // convert it to the string
++                                ipv4_address.netmask = getNetmask(*mask);
++                            }
++                        }
++                        else
++                        {
++                            BMCWEB_LOG_ERROR
++                                << "Got extra property: " << property.first
++                                << " on the " << objpath.first.str << " object";
++                        }
++                    }
++                    // Check if given address is local, or global
++                    ipv4_address.linktype =
++                        boost::starts_with(ipv4_address.address, "169.254.")
++                            ? LinkType::Global
++                            : LinkType::Local;
++                }
++            }
++        }
++    }
++}
++
++/**
++ * @brief Sets given Id on the given VLAN interface through D-Bus
++ *
++ * @param[in] ifaceId       Id of VLAN interface that should be modified
++ * @param[in] inputVlanId   New ID of the VLAN
++ * @param[in] callback      Function that will be called after the operation
++ *
++ * @return None.
++ */
++template <typename CallbackFunc>
++void changeVlanId(const std::string &ifaceId, const uint32_t &inputVlanId,
++                  CallbackFunc &&callback)
++{
++    crow::connections::systemBus->async_method_call(
++        callback, "xyz.openbmc_project.Network",
++        std::string("/xyz/openbmc_project/network/") + ifaceId,
++        "org.freedesktop.DBus.Properties", "Set",
++        "xyz.openbmc_project.Network.VLAN", "Id",
++        std::variant<uint32_t>(inputVlanId));
++}
++
++/**
++ * @brief Helper function that verifies IP address to check if it is in
++ *        proper format. If bits pointer is provided, also calculates active
++ *        bit count for Subnet Mask.
++ *
++ * @param[in]  ip     IP that will be verified
++ * @param[out] bits   Calculated mask in bits notation
++ *
++ * @return true in case of success, false otherwise
++ */
++inline bool ipv4VerifyIpAndGetBitcount(const std::string &ip,
++                                       uint8_t *bits = nullptr)
++{
++    std::vector<std::string> bytesInMask;
++
++    boost::split(bytesInMask, ip, boost::is_any_of("."));
++
++    static const constexpr int ipV4AddressSectionsCount = 4;
++    if (bytesInMask.size() != ipV4AddressSectionsCount)
++    {
++        return false;
++    }
++
++    if (bits != nullptr)
++    {
++        *bits = 0;
++    }
++
++    char *endPtr;
++    long previousValue = 255;
++    bool firstZeroInByteHit;
++    for (const std::string &byte : bytesInMask)
++    {
++        if (byte.empty())
++        {
++            return false;
++        }
++
++        // Use strtol instead of stroi to avoid exceptions
++        long value = std::strtol(byte.c_str(), &endPtr, 10);
++
++        // endPtr should point to the end of the string, otherwise given string
++        // is not 100% number
++        if (*endPtr != '\0')
++        {
++            return false;
++        }
++
++        // Value should be contained in byte
++        if (value < 0 || value > 255)
++        {
++            return false;
++        }
++
++        if (bits != nullptr)
++        {
++            // Mask has to be continuous between bytes
++            if (previousValue != 255 && value != 0)
++            {
++                return false;
++            }
++
++            // Mask has to be continuous inside bytes
++            firstZeroInByteHit = false;
++
++            // Count bits
++            for (int bitIdx = 7; bitIdx >= 0; bitIdx--)
++            {
++                if (value & (1 << bitIdx))
++                {
++                    if (firstZeroInByteHit)
++                    {
++                        // Continuity not preserved
++                        return false;
++                    }
++                    else
++                    {
++                        (*bits)++;
++                    }
++                }
++                else
++                {
++                    firstZeroInByteHit = true;
++                }
++            }
++        }
++
++        previousValue = value;
++    }
++
++    return true;
++}
++
++/**
++ * @brief Changes IPv4 address type property (Address, Gateway)
++ *
++ * @param[in] ifaceId     Id of interface whose IP should be modified
++ * @param[in] ipIdx       Index of IP in input array that should be modified
++ * @param[in] ipHash      DBus Hash id of modified IP
++ * @param[in] name        Name of field in JSON representation
++ * @param[in] newValue    New value that should be written
++ * @param[io] asyncResp   Response object that will be returned to client
++ *
++ * @return true if give IP is valid and has been sent do D-Bus, false
++ * otherwise
++ */
++inline void changeIPv4AddressProperty(
++    const std::string &ifaceId, int ipIdx, const std::string &ipHash,
++    const std::string &name, const std::string &newValue,
++    const std::shared_ptr<AsyncResp> asyncResp)
++{
++    auto callback = [asyncResp, ipIdx, name{std::string(name)},
++                     newValue{std::move(newValue)}](
++                        const boost::system::error_code ec) {
++        if (ec)
++        {
++            messages::internalError(asyncResp->res);
++        }
++        else
++        {
++            asyncResp->res.jsonValue["IPv4Addresses"][ipIdx][name] = newValue;
++        }
++    };
++
++    crow::connections::systemBus->async_method_call(
++        std::move(callback), "xyz.openbmc_project.Network",
++        "/xyz/openbmc_project/network/" + ifaceId + "/ipv4/" + ipHash,
++        "org.freedesktop.DBus.Properties", "Set",
++        "xyz.openbmc_project.Network.IP", name,
++        std::variant<std::string>(newValue));
++}
++
++/**
++ * @brief Changes IPv4 address origin property
++ *
++ * @param[in] ifaceId       Id of interface whose IP should be modified
++ * @param[in] ipIdx         Index of IP in input array that should be
++ * modified
++ * @param[in] ipHash        DBus Hash id of modified IP
++ * @param[in] newValue      New value in Redfish format
++ * @param[in] newValueDbus  New value in D-Bus format
++ * @param[io] asyncResp     Response object that will be returned to client
++ *
++ * @return true if give IP is valid and has been sent do D-Bus, false
++ * otherwise
++ */
++inline void changeIPv4Origin(const std::string &ifaceId, int ipIdx,
++                             const std::string &ipHash,
++                             const std::string &newValue,
++                             const std::string &newValueDbus,
++                             const std::shared_ptr<AsyncResp> asyncResp)
++{
++    auto callback = [asyncResp, ipIdx, newValue{std::move(newValue)}](
++                        const boost::system::error_code ec) {
++        if (ec)
++        {
++            messages::internalError(asyncResp->res);
++        }
++        else
++        {
++            asyncResp->res.jsonValue["IPv4Addresses"][ipIdx]["AddressOrigin"] =
++                newValue;
++        }
++    };
++
++    crow::connections::systemBus->async_method_call(
++        std::move(callback), "xyz.openbmc_project.Network",
++        "/xyz/openbmc_project/network/" + ifaceId + "/ipv4/" + ipHash,
++        "org.freedesktop.DBus.Properties", "Set",
++        "xyz.openbmc_project.Network.IP", "Origin",
++        std::variant<std::string>(newValueDbus));
++}
++
++/**
++ * @brief Modifies SubnetMask for given IP
++ *
++ * @param[in] ifaceId      Id of interface whose IP should be modified
++ * @param[in] ipIdx        Index of IP in input array that should be
++ * modified
++ * @param[in] ipHash       DBus Hash id of modified IP
++ * @param[in] newValueStr  Mask in dot notation as string
++ * @param[in] newValue     Mask as PrefixLength in bitcount
++ * @param[io] asyncResp   Response object that will be returned to client
++ *
++ * @return None
++ */
++inline void changeIPv4SubnetMaskProperty(const std::string &ifaceId, int ipIdx,
++                                         const std::string &ipHash,
++                                         const std::string &newValueStr,
++                                         uint8_t &newValue,
++                                         std::shared_ptr<AsyncResp> asyncResp)
++{
++    auto callback = [asyncResp, ipIdx, newValueStr{std::move(newValueStr)}](
++                        const boost::system::error_code ec) {
++        if (ec)
++        {
++            messages::internalError(asyncResp->res);
++        }
++        else
++        {
++            asyncResp->res.jsonValue["IPv4Addresses"][ipIdx]["SubnetMask"] =
++                newValueStr;
++        }
++    };
++
++    crow::connections::systemBus->async_method_call(
++        std::move(callback), "xyz.openbmc_project.Network",
++        "/xyz/openbmc_project/network/" + ifaceId + "/ipv4/" + ipHash,
++        "org.freedesktop.DBus.Properties", "Set",
++        "xyz.openbmc_project.Network.IP", "PrefixLength",
++        std::variant<uint8_t>(newValue));
++}
++
++/**
++ * @brief Deletes given IPv4
++ *
++ * @param[in] ifaceId     Id of interface whose IP should be deleted
++ * @param[in] ipIdx       Index of IP in input array that should be deleted
++ * @param[in] ipHash      DBus Hash id of IP that should be deleted
++ * @param[io] asyncResp   Response object that will be returned to client
++ *
++ * @return None
++ */
++inline void deleteIPv4(const std::string &ifaceId, const std::string &ipHash,
++                       unsigned int ipIdx,
++                       const std::shared_ptr<AsyncResp> asyncResp)
++{
++    crow::connections::systemBus->async_method_call(
++        [ipIdx, asyncResp](const boost::system::error_code ec) {
++            if (ec)
++            {
++                messages::internalError(asyncResp->res);
++            }
++            else
++            {
++                asyncResp->res.jsonValue["IPv4Addresses"][ipIdx] = nullptr;
++            }
++        },
++        "xyz.openbmc_project.Network",
++        "/xyz/openbmc_project/network/" + ifaceId + "/ipv4/" + ipHash,
++        "xyz.openbmc_project.Object.Delete", "Delete");
++}
++
++/**
++ * @brief Creates IPv4 with given data
++ *
++ * @param[in] ifaceId     Id of interface whose IP should be deleted
++ * @param[in] ipIdx       Index of IP in input array that should be deleted
++ * @param[in] ipHash      DBus Hash id of IP that should be deleted
++ * @param[io] asyncResp   Response object that will be returned to client
++ *
++ * @return None
++ */
++inline void createIPv4(const std::string &ifaceId, unsigned int ipIdx,
++                       uint8_t subnetMask, const std::string &gateway,
++                       const std::string &address,
++                       std::shared_ptr<AsyncResp> asyncResp)
++{
++    auto createIpHandler = [ipIdx,
++                            asyncResp](const boost::system::error_code ec) {
++        if (ec)
++        {
++            messages::internalError(asyncResp->res);
++        }
++    };
++
++    crow::connections::systemBus->async_method_call(
++        std::move(createIpHandler), "xyz.openbmc_project.Network",
++        "/xyz/openbmc_project/network/" + ifaceId,
++        "xyz.openbmc_project.Network.IP.Create", "IP",
++        "xyz.openbmc_project.Network.IP.Protocol.IPv4", address, subnetMask,
++        gateway);
++}
++
++/**
++ * Function that retrieves all properties for given Ethernet Interface
++ * Object
++ * from EntityManager Network Manager
++ * @param ethiface_id a eth interface id to query on DBus
++ * @param callback a function that shall be called to convert Dbus output
++ * into JSON
++ */
++template <typename CallbackFunc>
++void getEthernetIfaceData(const std::string &ethiface_id,
++                          CallbackFunc &&callback)
++{
++    crow::connections::systemBus->async_method_call(
++        [ethiface_id{std::string{ethiface_id}}, callback{std::move(callback)}](
++            const boost::system::error_code error_code,
++            const GetManagedObjects &resp) {
++            EthernetInterfaceData ethData{};
++            boost::container::flat_set<IPv4AddressData> ipv4Data;
++
++            if (error_code)
++            {
++                callback(false, ethData, ipv4Data);
++                return;
++            }
++
++            extractEthernetInterfaceData(ethiface_id, resp, ethData);
++            extractIPData(ethiface_id, resp, ipv4Data);
++
++            // Fix global GW
++            for (IPv4AddressData &ipv4 : ipv4Data)
++            {
++                if ((ipv4.linktype == LinkType::Global) &&
++                    (ipv4.gateway == "0.0.0.0"))
++                {
++                    ipv4.gateway = ethData.default_gateway;
++                }
++            }
++
++            // Finally make a callback with usefull data
++            callback(true, ethData, ipv4Data);
++        },
++        "xyz.openbmc_project.Network", "/xyz/openbmc_project/network",
++        "org.freedesktop.DBus.ObjectManager", "GetManagedObjects");
++};
++
++/**
++ * Function that retrieves all Ethernet Interfaces available through Network
++ * Manager
++ * @param callback a function that shall be called to convert Dbus output
++ * into JSON.
++ */
++template <typename CallbackFunc>
++void getEthernetIfaceList(CallbackFunc &&callback)
++{
++    crow::connections::systemBus->async_method_call(
++        [callback{std::move(callback)}](
++            const boost::system::error_code error_code,
++            GetManagedObjects &resp) {
++            // Callback requires vector<string> to retrieve all available
++            // ethernet interfaces
++            std::vector<std::string> iface_list;
++            iface_list.reserve(resp.size());
++            if (error_code)
++            {
++                callback(false, iface_list);
++                return;
++            }
++
++            // Iterate over all retrieved ObjectPaths.
++            for (const auto &objpath : resp)
++            {
++                // And all interfaces available for certain ObjectPath.
++                for (const auto &interface : objpath.second)
++                {
++                    // If interface is
++                    // xyz.openbmc_project.Network.EthernetInterface, this is
++                    // what we're looking for.
++                    if (interface.first ==
++                        "xyz.openbmc_project.Network.EthernetInterface")
++                    {
++                        // Cut out everyting until last "/", ...
++                        const std::string &iface_id = objpath.first.str;
++                        std::size_t last_pos = iface_id.rfind("/");
++                        if (last_pos != std::string::npos)
++                        {
++                            // and put it into output vector.
++                            iface_list.emplace_back(
++                                iface_id.substr(last_pos + 1));
++                        }
++                    }
++                }
++            }
++            // Finally make a callback with useful data
++            callback(true, iface_list);
++        },
++        "xyz.openbmc_project.Network", "/xyz/openbmc_project/network",
++        "org.freedesktop.DBus.ObjectManager", "GetManagedObjects");
++};
++
++/**
++ * EthernetCollection derived class for delivering Ethernet Collection Schema
++ */
++class EthernetCollection : public Node
++{
++  public:
++    template <typename CrowApp>
++    EthernetCollection(CrowApp &app) :
++        Node(app, "/redfish/v1/Managers/rmc/EthernetInterfaces/")
++    {
++        entityPrivileges = {
++            {boost::beast::http::verb::get, {{"Login"}}},
++            {boost::beast::http::verb::head, {{"Login"}}},
++            {boost::beast::http::verb::patch, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::put, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::delete_, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::post, {{"ConfigureComponents"}}}};
++    }
++
++  private:
++    /**
++     * Functions triggers appropriate requests on DBus
++     */
++    void doGet(crow::Response &res, const crow::Request &req,
++               const std::vector<std::string> &params) override
++    {
++        res.jsonValue["@odata.type"] =
++            "#EthernetInterfaceCollection.EthernetInterfaceCollection";
++        res.jsonValue["@odata.context"] =
++            "/redfish/v1/"
++            "$metadata#EthernetInterfaceCollection.EthernetInterfaceCollection";
++        res.jsonValue["@odata.id"] =
++            "/redfish/v1/Managers/bmc/EthernetInterfaces";
++        res.jsonValue["Name"] = "Ethernet Network Interface Collection";
++        res.jsonValue["Description"] =
++            "Collection of EthernetInterfaces for this Manager";
++
++        // Get eth interface list, and call the below callback for JSON
++        // preparation
++        getEthernetIfaceList(
++            [&res](const bool &success,
++                   const std::vector<std::string> &iface_list) {
++                if (!success)
++                {
++                    messages::internalError(res);
++                    res.end();
++                    return;
++                }
++
++                nlohmann::json &iface_array = res.jsonValue["Members"];
++                iface_array = nlohmann::json::array();
++                for (const std::string &iface_item : iface_list)
++                {
++                    iface_array.push_back(
++                        {{"@odata.id",
++                          "/redfish/v1/Managers/bmc/EthernetInterfaces/" +
++                              iface_item}});
++                }
++
++                res.jsonValue["Members@odata.count"] = iface_array.size();
++                res.jsonValue["@odata.id"] =
++                    "/redfish/v1/Managers/bmc/EthernetInterfaces";
++                res.end();
++            });
++    }
++};
++
++/**
++ * EthernetInterface derived class for delivering Ethernet Schema
++ */
++class EthernetInterface : public Node
++{
++  public:
++    /*
++     * Default Constructor
++     */
++    template <typename CrowApp>
++    EthernetInterface(CrowApp &app) :
++        Node(app, "/redfish/v1/Managers/rmc/EthernetInterfaces/<str>/",
++             std::string())
++    {
++        entityPrivileges = {
++            {boost::beast::http::verb::get, {{"Login"}}},
++            {boost::beast::http::verb::head, {{"Login"}}},
++            {boost::beast::http::verb::patch, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::put, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::delete_, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::post, {{"ConfigureComponents"}}}};
++    }
++
++    // TODO(kkowalsk) Find a suitable class/namespace for this
++    static void handleVlanPatch(const std::string &ifaceId, bool vlanEnable,
++                                uint64_t vlanId,
++                                const EthernetInterfaceData &ethData,
++                                const std::shared_ptr<AsyncResp> asyncResp)
++    {
++        if (!ethData.vlan_id)
++        {
++            // This interface is not a VLAN. Cannot do anything with it
++            // TODO(kkowalsk) Change this message
++            messages::propertyNotWritable(asyncResp->res, "VLANEnable");
++
++            return;
++        }
++
++        // VLAN is configured on the interface
++        if (vlanEnable == true)
++        {
++            // Change VLAN Id
++            asyncResp->res.jsonValue["VLANId"] = vlanId;
++            auto callback = [asyncResp](const boost::system::error_code ec) {
++                if (ec)
++                {
++                    messages::internalError(asyncResp->res);
++                }
++                else
++                {
++                    asyncResp->res.jsonValue["VLANEnable"] = true;
++                }
++            };
++            crow::connections::systemBus->async_method_call(
++                std::move(callback), "xyz.openbmc_project.Network",
++                "/xyz/openbmc_project/network/" + ifaceId,
++                "org.freedesktop.DBus.Properties", "Set",
++                "xyz.openbmc_project.Network.VLAN", "Id",
++                std::variant<uint32_t>(vlanId));
++        }
++        else
++        {
++            auto callback = [asyncResp](const boost::system::error_code ec) {
++                if (ec)
++                {
++                    messages::internalError(asyncResp->res);
++                    return;
++                }
++                asyncResp->res.jsonValue["VLANEnable"] = false;
++            };
++
++            crow::connections::systemBus->async_method_call(
++                std::move(callback), "xyz.openbmc_project.Network",
++                "/xyz/openbmc_project/network/" + ifaceId,
++                "xyz.openbmc_project.Object.Delete", "Delete");
++        }
++    }
++
++  private:
++    void handleHostnamePatch(const std::string &hostname,
++                             const std::shared_ptr<AsyncResp> asyncResp)
++    {
++        asyncResp->res.jsonValue["HostName"] = hostname;
++        crow::connections::systemBus->async_method_call(
++            [asyncResp](const boost::system::error_code ec) {
++                if (ec)
++                {
++                    messages::internalError(asyncResp->res);
++                }
++            },
++            "xyz.openbmc_project.Network",
++            "/xyz/openbmc_project/network/config",
++            "org.freedesktop.DBus.Properties", "Set",
++            "xyz.openbmc_project.Network.SystemConfiguration", "HostName",
++            std::variant<std::string>(hostname));
++    }
++
++    void handleIPv4Patch(
++        const std::string &ifaceId, const nlohmann::json &input,
++        const boost::container::flat_set<IPv4AddressData> &ipv4Data,
++        const std::shared_ptr<AsyncResp> asyncResp)
++    {
++        if (!input.is_array())
++        {
++            messages::propertyValueTypeError(asyncResp->res, input.dump(),
++                                             "IPv4Addresses");
++            return;
++        }
++
++        // According to Redfish PATCH definition, size must be at least equal
++        if (input.size() < ipv4Data.size())
++        {
++            messages::propertyValueFormatError(asyncResp->res, input.dump(),
++                                               "IPv4Addresses");
++            return;
++        }
++
++        int entryIdx = 0;
++        boost::container::flat_set<IPv4AddressData>::const_iterator thisData =
++            ipv4Data.begin();
++        for (const nlohmann::json &thisJson : input)
++        {
++            std::string pathString =
++                "IPv4Addresses/" + std::to_string(entryIdx);
++            // Check that entry is not of some unexpected type
++            if (!thisJson.is_object() && !thisJson.is_null())
++            {
++                messages::propertyValueTypeError(asyncResp->res,
++                                                 thisJson.dump(),
++                                                 pathString + "/IPv4Address");
++
++                continue;
++            }
++
++            nlohmann::json::const_iterator addressFieldIt =
++                thisJson.find("Address");
++            const std::string *addressField = nullptr;
++            if (addressFieldIt != thisJson.end())
++            {
++                addressField = addressFieldIt->get_ptr<const std::string *>();
++                if (addressField == nullptr)
++                {
++                    messages::propertyValueFormatError(asyncResp->res,
++                                                       addressFieldIt->dump(),
++                                                       pathString + "/Address");
++                    continue;
++                }
++                else
++                {
++                    if (!ipv4VerifyIpAndGetBitcount(*addressField))
++                    {
++                        messages::propertyValueFormatError(
++                            asyncResp->res, *addressField,
++                            pathString + "/Address");
++                        continue;
++                    }
++                }
++            }
++
++            std::optional<uint8_t> prefixLength;
++            const std::string *subnetField = nullptr;
++            nlohmann::json::const_iterator subnetFieldIt =
++                thisJson.find("SubnetMask");
++            if (subnetFieldIt != thisJson.end())
++            {
++                subnetField = subnetFieldIt->get_ptr<const std::string *>();
++                if (subnetField == nullptr)
++                {
++                    messages::propertyValueFormatError(
++                        asyncResp->res, *subnetField,
++                        pathString + "/SubnetMask");
++                    continue;
++                }
++                else
++                {
++                    prefixLength = 0;
++                    if (!ipv4VerifyIpAndGetBitcount(*subnetField,
++                                                    &*prefixLength))
++                    {
++                        messages::propertyValueFormatError(
++                            asyncResp->res, *subnetField,
++                            pathString + "/SubnetMask");
++                        continue;
++                    }
++                }
++            }
++
++            std::string addressOriginInDBusFormat;
++            const std::string *addressOriginField = nullptr;
++            nlohmann::json::const_iterator addressOriginFieldIt =
++                thisJson.find("AddressOrigin");
++            if (addressOriginFieldIt != thisJson.end())
++            {
++                const std::string *addressOriginField =
++                    addressOriginFieldIt->get_ptr<const std::string *>();
++                if (addressOriginField == nullptr)
++                {
++                    messages::propertyValueFormatError(
++                        asyncResp->res, *addressOriginField,
++                        pathString + "/AddressOrigin");
++                    continue;
++                }
++                else
++                {
++                    // Get Address origin in proper format
++                    addressOriginInDBusFormat =
++                        translateAddressOriginRedfishToDbus(
++                            *addressOriginField);
++                    if (addressOriginInDBusFormat.empty())
++                    {
++                        messages::propertyValueNotInList(
++                            asyncResp->res, *addressOriginField,
++                            pathString + "/AddressOrigin");
++                        continue;
++                    }
++                }
++            }
++
++            nlohmann::json::const_iterator gatewayFieldIt =
++                thisJson.find("Gateway");
++            const std::string *gatewayField = nullptr;
++            if (gatewayFieldIt != thisJson.end())
++            {
++                const std::string *gatewayField =
++                    gatewayFieldIt->get_ptr<const std::string *>();
++                if (gatewayField == nullptr ||
++                    !ipv4VerifyIpAndGetBitcount(*gatewayField))
++                {
++                    messages::propertyValueFormatError(
++                        asyncResp->res, *gatewayField, pathString + "/Gateway");
++                    continue;
++                }
++            }
++
++            // if a vlan already exists, modify the existing
++            if (thisData != ipv4Data.end())
++            {
++                // Existing object that should be modified/deleted/remain
++                // unchanged
++                if (thisJson.is_null())
++                {
++                    auto callback = [entryIdx{std::to_string(entryIdx)},
++                                     asyncResp](
++                                        const boost::system::error_code ec) {
++                        if (ec)
++                        {
++                            messages::internalError(asyncResp->res);
++                            return;
++                        }
++                        asyncResp->res.jsonValue["IPv4Addresses"][entryIdx] =
++                            nullptr;
++                    };
++                    crow::connections::systemBus->async_method_call(
++                        std::move(callback), "xyz.openbmc_project.Network",
++                        "/xyz/openbmc_project/network/" + ifaceId + "/ipv4/" +
++                            thisData->id,
++                        "xyz.openbmc_project.Object.Delete", "Delete");
++                }
++                else if (thisJson.is_object())
++                {
++                    // Apply changes
++                    if (addressField != nullptr)
++                    {
++                        auto callback =
++                            [asyncResp, entryIdx,
++                             addressField{std::string(*addressField)}](
++                                const boost::system::error_code ec) {
++                                if (ec)
++                                {
++                                    messages::internalError(asyncResp->res);
++                                    return;
++                                }
++                                asyncResp->res
++                                    .jsonValue["IPv4Addresses"][std::to_string(
++                                        entryIdx)]["Address"] = addressField;
++                            };
++
++                        crow::connections::systemBus->async_method_call(
++                            std::move(callback), "xyz.openbmc_project.Network",
++                            "/xyz/openbmc_project/network/" + ifaceId +
++                                "/ipv4/" + thisData->id,
++                            "org.freedesktop.DBus.Properties", "Set",
++                            "xyz.openbmc_project.Network.IP", "Address",
++                            std::variant<std::string>(*addressField));
++                    }
++
++                    if (prefixLength && subnetField != nullptr)
++                    {
++                        changeIPv4SubnetMaskProperty(ifaceId, entryIdx,
++                                                     thisData->id, *subnetField,
++                                                     *prefixLength, asyncResp);
++                    }
++
++                    if (!addressOriginInDBusFormat.empty() &&
++                        addressOriginField != nullptr)
++                    {
++                        changeIPv4Origin(ifaceId, entryIdx, thisData->id,
++                                         *addressOriginField,
++                                         addressOriginInDBusFormat, asyncResp);
++                    }
++
++                    if (gatewayField != nullptr)
++                    {
++                        auto callback =
++                            [asyncResp, entryIdx,
++                             gatewayField{std::string(*gatewayField)}](
++                                const boost::system::error_code ec) {
++                                if (ec)
++                                {
++                                    messages::internalError(asyncResp->res);
++                                    return;
++                                }
++                                asyncResp->res
++                                    .jsonValue["IPv4Addresses"][std::to_string(
++                                        entryIdx)]["Gateway"] =
++                                    std::move(gatewayField);
++                            };
++
++                        crow::connections::systemBus->async_method_call(
++                            std::move(callback), "xyz.openbmc_project.Network",
++                            "/xyz/openbmc_project/network/" + ifaceId +
++                                "/ipv4/" + thisData->id,
++                            "org.freedesktop.DBus.Properties", "Set",
++                            "xyz.openbmc_project.Network.IP", "Gateway",
++                            std::variant<std::string>(*gatewayField));
++                    }
++                }
++                thisData++;
++            }
++            else
++            {
++                // Create IPv4 with provided data
++                if (gatewayField == nullptr)
++                {
++                    messages::propertyMissing(asyncResp->res,
++                                              pathString + "/Gateway");
++                    continue;
++                }
++
++                if (addressField == nullptr)
++                {
++                    messages::propertyMissing(asyncResp->res,
++                                              pathString + "/Address");
++                    continue;
++                }
++
++                if (!prefixLength)
++                {
++                    messages::propertyMissing(asyncResp->res,
++                                              pathString + "/SubnetMask");
++                    continue;
++                }
++
++                createIPv4(ifaceId, entryIdx, *prefixLength, *gatewayField,
++                           *addressField, asyncResp);
++                asyncResp->res.jsonValue["IPv4Addresses"][entryIdx] = thisJson;
++            }
++            entryIdx++;
++        }
++    }
++
++    void parseInterfaceData(
++        nlohmann::json &json_response, const std::string &iface_id,
++        const EthernetInterfaceData &ethData,
++        const boost::container::flat_set<IPv4AddressData> &ipv4Data)
++    {
++        json_response["Id"] = iface_id;
++        json_response["@odata.id"] =
++            "/redfish/v1/Managers/bmc/EthernetInterfaces/" + iface_id;
++        json_response["InterfaceEnabled"] = true;
++        if (ethData.speed == 0)
++        {
++            json_response["LinkStatus"] = "NoLink";
++            json_response["Status"] = {
++                {"Health", "OK"},
++                {"State", "Disabled"},
++            };
++        }
++        else
++        {
++            json_response["LinkStatus"] = "LinkUp";
++            json_response["Status"] = {
++                {"Health", "OK"},
++                {"State", "Enabled"},
++            };
++        }
++        json_response["SpeedMbps"] = ethData.speed;
++        json_response["MACAddress"] = ethData.mac_address;
++        if (!ethData.hostname.empty())
++        {
++            json_response["HostName"] = ethData.hostname;
++        }
++
++        nlohmann::json &vlanObj = json_response["VLAN"];
++        if (ethData.vlan_id)
++        {
++            vlanObj["VLANEnable"] = true;
++            vlanObj["VLANId"] = *ethData.vlan_id;
++        }
++        else
++        {
++            vlanObj["VLANEnable"] = false;
++            vlanObj["VLANId"] = 0;
++        }
++        json_response["NameServers"] = ethData.nameservers;
++
++        if (ipv4Data.size() > 0)
++        {
++            nlohmann::json &ipv4_array = json_response["IPv4Addresses"];
++            ipv4_array = nlohmann::json::array();
++            for (auto &ipv4_config : ipv4Data)
++            {
++                ipv4_array.push_back({{"AddressOrigin", ipv4_config.origin},
++                                      {"SubnetMask", ipv4_config.netmask},
++                                      {"Address", ipv4_config.address},
++                                      {"Gateway", ipv4_config.gateway}});
++            }
++        }
++    }
++
++    /**
++     * Functions triggers appropriate requests on DBus
++     */
++    void doGet(crow::Response &res, const crow::Request &req,
++               const std::vector<std::string> &params) override
++    {
++        std::shared_ptr<AsyncResp> asyncResp = std::make_shared<AsyncResp>(res);
++        if (params.size() != 1)
++        {
++            messages::internalError(asyncResp->res);
++            return;
++        }
++
++        getEthernetIfaceData(
++            params[0],
++            [this, asyncResp, iface_id{std::string(params[0])}](
++                const bool &success, const EthernetInterfaceData &ethData,
++                const boost::container::flat_set<IPv4AddressData> &ipv4Data) {
++                if (!success)
++                {
++                    // TODO(Pawel)consider distinguish between non existing
++                    // object, and other errors
++                    messages::resourceNotFound(asyncResp->res,
++                                               "EthernetInterface", iface_id);
++                    return;
++                }
++                asyncResp->res.jsonValue["@odata.type"] =
++                    "#EthernetInterface.v1_2_0.EthernetInterface";
++                asyncResp->res.jsonValue["@odata.context"] =
++                    "/redfish/v1/$metadata#EthernetInterface.EthernetInterface";
++                asyncResp->res.jsonValue["Name"] = "Manager Ethernet Interface";
++                asyncResp->res.jsonValue["Description"] =
++                    "Management Network Interface";
++
++                parseInterfaceData(asyncResp->res.jsonValue, iface_id, ethData,
++                                   ipv4Data);
++            });
++    }
++
++    void doPatch(crow::Response &res, const crow::Request &req,
++                 const std::vector<std::string> &params) override
++    {
++        std::shared_ptr<AsyncResp> asyncResp = std::make_shared<AsyncResp>(res);
++        if (params.size() != 1)
++        {
++            messages::internalError(asyncResp->res);
++            return;
++        }
++
++        const std::string &iface_id = params[0];
++
++        std::optional<nlohmann::json> vlan;
++        std::optional<std::string> hostname;
++        std::optional<nlohmann::json> ipv4Addresses;
++        std::optional<nlohmann::json> ipv6Addresses;
++
++        if (!json_util::readJson(req, res, "VLAN", vlan, "HostName", hostname,
++                                 "IPv4Addresses", ipv4Addresses,
++                                 "IPv6Addresses", ipv6Addresses))
++        {
++            return;
++        }
++        std::optional<uint64_t> vlanId = 0;
++        std::optional<bool> vlanEnable = false;
++        if (vlan)
++        {
++            if (!json_util::readJson(*vlan, res, "VLANEnable", vlanEnable,
++                                     "VLANId", vlanId))
++            {
++                return;
++            }
++            // Need both vlanId and vlanEnable to service this request
++            if (static_cast<bool>(vlanId) ^ static_cast<bool>(vlanEnable))
++            {
++                if (vlanId)
++                {
++                    messages::propertyMissing(asyncResp->res, "VLANEnable");
++                }
++                else
++                {
++                    messages::propertyMissing(asyncResp->res, "VLANId");
++                }
++
++                return;
++            }
++        }
++
++        // Get single eth interface data, and call the below callback for JSON
++        // preparation
++        getEthernetIfaceData(
++            iface_id,
++            [this, asyncResp, iface_id, vlanId, vlanEnable,
++             hostname = std::move(hostname),
++             ipv4Addresses = std::move(ipv4Addresses),
++             ipv6Addresses = std::move(ipv6Addresses)](
++                const bool &success, const EthernetInterfaceData &ethData,
++                const boost::container::flat_set<IPv4AddressData> &ipv4Data) {
++                if (!success)
++                {
++                    // ... otherwise return error
++                    // TODO(Pawel)consider distinguish between non existing
++                    // object, and other errors
++                    messages::resourceNotFound(
++                        asyncResp->res, "VLAN Network Interface", iface_id);
++                    return;
++                }
++
++                parseInterfaceData(asyncResp->res.jsonValue, iface_id, ethData,
++                                   ipv4Data);
++
++                if (vlanId && vlanEnable)
++                {
++                    handleVlanPatch(iface_id, *vlanId, *vlanEnable, ethData,
++                                    asyncResp);
++                }
++
++                if (hostname)
++                {
++                    handleHostnamePatch(*hostname, asyncResp);
++                }
++
++                if (ipv4Addresses)
++                {
++                    handleIPv4Patch(iface_id, *ipv4Addresses, ipv4Data,
++                                    asyncResp);
++                }
++
++                if (ipv6Addresses)
++                {
++                    // TODO(kkowalsk) IPv6 Not supported on D-Bus yet
++                    messages::propertyNotWritable(asyncResp->res,
++                                                  "IPv6Addresses");
++                }
++            });
++    }
++};
++
++/**
++ * VlanNetworkInterface derived class for delivering VLANNetworkInterface
++ * Schema
++ */
++class VlanNetworkInterface : public Node
++{
++  public:
++    /*
++     * Default Constructor
++     */
++    template <typename CrowApp>
++    VlanNetworkInterface(CrowApp &app) :
++        Node(app,
++             "/redfish/v1/Managers/rmc/EthernetInterfaces/<str>/VLANs/<str>",
++             std::string(), std::string())
++    {
++        entityPrivileges = {
++            {boost::beast::http::verb::get, {{"Login"}}},
++            {boost::beast::http::verb::head, {{"Login"}}},
++            {boost::beast::http::verb::patch, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::put, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::delete_, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::post, {{"ConfigureComponents"}}}};
++    }
++
++  private:
++    void parseInterfaceData(
++        nlohmann::json &json_response, const std::string &parent_iface_id,
++        const std::string &iface_id, const EthernetInterfaceData &ethData,
++        const boost::container::flat_set<IPv4AddressData> &ipv4Data)
++    {
++        // Fill out obvious data...
++        json_response["Id"] = iface_id;
++        json_response["@odata.id"] =
++            "/redfish/v1/Managers/bmc/EthernetInterfaces/" + parent_iface_id +
++            "/VLANs/" + iface_id;
++
++        json_response["VLANEnable"] = true;
++        if (ethData.vlan_id)
++        {
++            json_response["VLANId"] = *ethData.vlan_id;
++        }
++    }
++
++    bool verifyNames(crow::Response &res, const std::string &parent,
++                     const std::string &iface)
++    {
++        std::shared_ptr<AsyncResp> asyncResp = std::make_shared<AsyncResp>(res);
++        if (!boost::starts_with(iface, parent + "_"))
++        {
++            messages::resourceNotFound(asyncResp->res, "VLAN Network Interface",
++                                       iface);
++            return false;
++        }
++        else
++        {
++            return true;
++        }
++    }
++
++    /**
++     * Functions triggers appropriate requests on DBus
++     */
++    void doGet(crow::Response &res, const crow::Request &req,
++               const std::vector<std::string> &params) override
++    {
++        std::shared_ptr<AsyncResp> asyncResp = std::make_shared<AsyncResp>(res);
++        // TODO(Pawel) this shall be parameterized call (two params) to get
++        // EthernetInterfaces for any Manager, not only hardcoded 'openbmc'.
++        // Check if there is required param, truly entering this shall be
++        // impossible.
++        if (params.size() != 2)
++        {
++            messages::internalError(res);
++            res.end();
++            return;
++        }
++
++        const std::string &parent_iface_id = params[0];
++        const std::string &iface_id = params[1];
++        res.jsonValue["@odata.type"] =
++            "#VLanNetworkInterface.v1_1_0.VLanNetworkInterface";
++        res.jsonValue["@odata.context"] =
++            "/redfish/v1/$metadata#VLanNetworkInterface.VLanNetworkInterface";
++        res.jsonValue["Name"] = "VLAN Network Interface";
++
++        if (!verifyNames(res, parent_iface_id, iface_id))
++        {
++            return;
++        }
++
++        // Get single eth interface data, and call the below callback for JSON
++        // preparation
++        getEthernetIfaceData(
++            iface_id,
++            [this, asyncResp, parent_iface_id, iface_id](
++                const bool &success, const EthernetInterfaceData &ethData,
++                const boost::container::flat_set<IPv4AddressData> &ipv4Data) {
++                if (success && ethData.vlan_id)
++                {
++                    parseInterfaceData(asyncResp->res.jsonValue,
++                                       parent_iface_id, iface_id, ethData,
++                                       ipv4Data);
++                }
++                else
++                {
++                    // ... otherwise return error
++                    // TODO(Pawel)consider distinguish between non existing
++                    // object, and other errors
++                    messages::resourceNotFound(
++                        asyncResp->res, "VLAN Network Interface", iface_id);
++                }
++            });
++    }
++
++    void doPatch(crow::Response &res, const crow::Request &req,
++                 const std::vector<std::string> &params) override
++    {
++        std::shared_ptr<AsyncResp> asyncResp = std::make_shared<AsyncResp>(res);
++        if (params.size() != 2)
++        {
++            messages::internalError(asyncResp->res);
++            return;
++        }
++
++        const std::string &parentIfaceId = params[0];
++        const std::string &ifaceId = params[1];
++
++        if (!verifyNames(res, parentIfaceId, ifaceId))
++        {
++            return;
++        }
++
++        bool vlanEnable = false;
++        uint64_t vlanId = 0;
++
++        if (!json_util::readJson(req, res, "VLANEnable", vlanEnable, "VLANId",
++                                 vlanId))
++        {
++            return;
++        }
++
++        // Get single eth interface data, and call the below callback for JSON
++        // preparation
++        getEthernetIfaceData(
++            ifaceId,
++            [this, asyncResp, parentIfaceId, ifaceId, vlanEnable, vlanId](
++                const bool &success, const EthernetInterfaceData &ethData,
++                const boost::container::flat_set<IPv4AddressData> &ipv4Data) {
++                if (!success)
++                {
++                    // TODO(Pawel)consider distinguish between non existing
++                    // object, and other errors
++                    messages::resourceNotFound(
++                        asyncResp->res, "VLAN Network Interface", ifaceId);
++
++                    return;
++                }
++
++                parseInterfaceData(asyncResp->res.jsonValue, parentIfaceId,
++                                   ifaceId, ethData, ipv4Data);
++
++                EthernetInterface::handleVlanPatch(ifaceId, vlanId, vlanEnable,
++                                                   ethData, asyncResp);
++            });
++    }
++
++    void doDelete(crow::Response &res, const crow::Request &req,
++                  const std::vector<std::string> &params) override
++    {
++        std::shared_ptr<AsyncResp> asyncResp = std::make_shared<AsyncResp>(res);
++        if (params.size() != 2)
++        {
++            messages::internalError(asyncResp->res);
++            return;
++        }
++
++        const std::string &parentIfaceId = params[0];
++        const std::string &ifaceId = params[1];
++
++        if (!verifyNames(asyncResp->res, parentIfaceId, ifaceId))
++        {
++            return;
++        }
++
++        // Get single eth interface data, and call the below callback for JSON
++        // preparation
++        getEthernetIfaceData(
++            ifaceId,
++            [this, asyncResp, parentIfaceId{std::string(parentIfaceId)},
++             ifaceId{std::string(ifaceId)}](
++                const bool &success, const EthernetInterfaceData &ethData,
++                const boost::container::flat_set<IPv4AddressData> &ipv4Data) {
++                if (success && ethData.vlan_id)
++                {
++                    parseInterfaceData(asyncResp->res.jsonValue, parentIfaceId,
++                                       ifaceId, ethData, ipv4Data);
++
++                    auto callback =
++                        [asyncResp](const boost::system::error_code ec) {
++                            if (ec)
++                            {
++                                messages::internalError(asyncResp->res);
++                            }
++                        };
++                    crow::connections::systemBus->async_method_call(
++                        std::move(callback), "xyz.openbmc_project.Network",
++                        std::string("/xyz/openbmc_project/network/") + ifaceId,
++                        "xyz.openbmc_project.Object.Delete", "Delete");
++                }
++                else
++                {
++                    // ... otherwise return error
++                    // TODO(Pawel)consider distinguish between non existing
++                    // object, and other errors
++                    messages::resourceNotFound(
++                        asyncResp->res, "VLAN Network Interface", ifaceId);
++                }
++            });
++    }
++};
++
++/**
++ * VlanNetworkInterfaceCollection derived class for delivering
++ * VLANNetworkInterface Collection Schema
++ */
++class VlanNetworkInterfaceCollection : public Node
++{
++  public:
++    template <typename CrowApp>
++    VlanNetworkInterfaceCollection(CrowApp &app) :
++        Node(app, "/redfish/v1/Managers/rmc/EthernetInterfaces/<str>/VLANs/",
++             std::string())
++    {
++        entityPrivileges = {
++            {boost::beast::http::verb::get, {{"Login"}}},
++            {boost::beast::http::verb::head, {{"Login"}}},
++            {boost::beast::http::verb::patch, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::put, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::delete_, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::post, {{"ConfigureComponents"}}}};
++    }
++
++  private:
++    /**
++     * Functions triggers appropriate requests on DBus
++     */
++    void doGet(crow::Response &res, const crow::Request &req,
++               const std::vector<std::string> &params) override
++    {
++        std::shared_ptr<AsyncResp> asyncResp = std::make_shared<AsyncResp>(res);
++        if (params.size() != 1)
++        {
++            // This means there is a problem with the router
++            messages::internalError(asyncResp->res);
++            return;
++        }
++
++        const std::string &rootInterfaceName = params[0];
++
++        // Get eth interface list, and call the below callback for JSON
++        // preparation
++        getEthernetIfaceList(
++            [this, asyncResp,
++             rootInterfaceName{std::string(rootInterfaceName)}](
++                const bool &success,
++                const std::vector<std::string> &iface_list) {
++                if (!success)
++                {
++                    messages::internalError(asyncResp->res);
++                    return;
++                }
++                asyncResp->res.jsonValue["@odata.type"] =
++                    "#VLanNetworkInterfaceCollection."
++                    "VLanNetworkInterfaceCollection";
++                asyncResp->res.jsonValue["@odata.context"] =
++                    "/redfish/v1/$metadata"
++                    "#VLanNetworkInterfaceCollection."
++                    "VLanNetworkInterfaceCollection";
++                asyncResp->res.jsonValue["Name"] =
++                    "VLAN Network Interface Collection";
++
++                nlohmann::json iface_array = nlohmann::json::array();
++
++                for (const std::string &iface_item : iface_list)
++                {
++                    if (boost::starts_with(iface_item, rootInterfaceName + "_"))
++                    {
++                        iface_array.push_back(
++                            {{"@odata.id",
++                              "/redfish/v1/Managers/bmc/EthernetInterfaces/" +
++                                  rootInterfaceName + "/VLANs/" + iface_item}});
++                    }
++                }
++
++                if (iface_array.empty())
++                {
++                    messages::resourceNotFound(
++                        asyncResp->res, "EthernetInterface", rootInterfaceName);
++                    return;
++                }
++                asyncResp->res.jsonValue["Members@odata.count"] =
++                    iface_array.size();
++                asyncResp->res.jsonValue["Members"] = std::move(iface_array);
++                asyncResp->res.jsonValue["@odata.id"] =
++                    "/redfish/v1/Managers/bmc/EthernetInterfaces/" +
++                    rootInterfaceName + "/VLANs";
++            });
++    }
++
++    void doPost(crow::Response &res, const crow::Request &req,
++                const std::vector<std::string> &params) override
++    {
++        std::shared_ptr<AsyncResp> asyncResp = std::make_shared<AsyncResp>(res);
++        if (params.size() != 1)
++        {
++            messages::internalError(asyncResp->res);
++            return;
++        }
++
++        uint32_t vlanId = 0;
++        if (!json_util::readJson(req, res, "VLANId", vlanId))
++        {
++            return;
++        }
++        const std::string &rootInterfaceName = params[0];
++        auto callback = [asyncResp](const boost::system::error_code ec) {
++            if (ec)
++            {
++                // TODO(ed) make more consistent error messages based on
++                // phosphor-network responses
++                messages::internalError(asyncResp->res);
++                return;
++            }
++            messages::created(asyncResp->res);
++        };
++        crow::connections::systemBus->async_method_call(
++            std::move(callback), "xyz.openbmc_project.Network",
++            "/xyz/openbmc_project/network",
++            "xyz.openbmc_project.Network.VLAN.Create", "VLAN",
++            rootInterfaceName, vlanId);
++    }
++};
++} // namespace redfish
+diff --git a/redfish-core/lib/rmc_log_services.hpp b/redfish-core/lib/rmc_log_services.hpp
+new file mode 100644
+index 0000000..2ae4d59
+--- /dev/null
++++ b/redfish-core/lib/rmc_log_services.hpp
+@@ -0,0 +1,1338 @@
++/*
++// Copyright (c) 2018 Intel Corporation
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++*/
++#pragma once
++
++#include "filesystem.hpp"
++#include "node.hpp"
++
++#include <systemd/sd-journal.h>
++
++#include <boost/container/flat_map.hpp>
++#include <boost/utility/string_view.hpp>
++#include <variant>
++
++namespace redfish
++{
++
++constexpr char const *cpuLogObject = "com.intel.CpuDebugLog";
++constexpr char const *cpuLogPath = "/com/intel/CpuDebugLog";
++constexpr char const *cpuLogImmediatePath = "/com/intel/CpuDebugLog/Immediate";
++constexpr char const *cpuLogInterface = "com.intel.CpuDebugLog";
++constexpr char const *cpuLogImmediateInterface =
++    "com.intel.CpuDebugLog.Immediate";
++constexpr char const *cpuLogRawPECIInterface =
++    "com.intel.CpuDebugLog.SendRawPeci";
++
++namespace fs = std::filesystem;
++
++static int getJournalMetadata(sd_journal *journal,
++                              const boost::string_view &field,
++                              boost::string_view &contents)
++{
++    const char *data = nullptr;
++    size_t length = 0;
++    int ret = 0;
++    // Get the metadata from the requested field of the journal entry
++    ret = sd_journal_get_data(journal, field.data(), (const void **)&data,
++                              &length);
++    if (ret < 0)
++    {
++        return ret;
++    }
++    contents = boost::string_view(data, length);
++    // Only use the content after the "=" character.
++    contents.remove_prefix(std::min(contents.find("=") + 1, contents.size()));
++    return ret;
++}
++
++static int getJournalMetadata(sd_journal *journal,
++                              const boost::string_view &field, const int &base,
++                              int &contents)
++{
++    int ret = 0;
++    boost::string_view metadata;
++    // Get the metadata from the requested field of the journal entry
++    ret = getJournalMetadata(journal, field, metadata);
++    if (ret < 0)
++    {
++        return ret;
++    }
++    contents = strtol(metadata.data(), nullptr, base);
++    return ret;
++}
++
++static bool getEntryTimestamp(sd_journal *journal, std::string &entryTimestamp)
++{
++    int ret = 0;
++    uint64_t timestamp = 0;
++    ret = sd_journal_get_realtime_usec(journal, &timestamp);
++    if (ret < 0)
++    {
++        BMCWEB_LOG_ERROR << "Failed to read entry timestamp: "
++                         << strerror(-ret);
++        return false;
++    }
++    time_t t =
++        static_cast<time_t>(timestamp / 1000 / 1000); // Convert from us to s
++    struct tm *loctime = localtime(&t);
++    char entryTime[64] = {};
++    if (NULL != loctime)
++    {
++        strftime(entryTime, sizeof(entryTime), "%FT%T%z", loctime);
++    }
++    // Insert the ':' into the timezone
++    boost::string_view t1(entryTime);
++    boost::string_view t2(entryTime);
++    if (t1.size() > 2 && t2.size() > 2)
++    {
++        t1.remove_suffix(2);
++        t2.remove_prefix(t2.size() - 2);
++    }
++    entryTimestamp = t1.to_string() + ":" + t2.to_string();
++    return true;
++}
++
++static bool getSkipParam(crow::Response &res, const crow::Request &req,
++                         long &skip)
++{
++    char *skipParam = req.urlParams.get("$skip");
++    if (skipParam != nullptr)
++    {
++        char *ptr = nullptr;
++        skip = std::strtol(skipParam, &ptr, 10);
++        if (*skipParam == '\0' || *ptr != '\0')
++        {
++
++            messages::queryParameterValueTypeError(res, std::string(skipParam),
++                                                   "$skip");
++            return false;
++        }
++        if (skip < 0)
++        {
++
++            messages::queryParameterOutOfRange(res, std::to_string(skip),
++                                               "$skip", "greater than 0");
++            return false;
++        }
++    }
++    return true;
++}
++
++static constexpr const long maxEntriesPerPage = 1000;
++static bool getTopParam(crow::Response &res, const crow::Request &req,
++                        long &top)
++{
++    char *topParam = req.urlParams.get("$top");
++    if (topParam != nullptr)
++    {
++        char *ptr = nullptr;
++        top = std::strtol(topParam, &ptr, 10);
++        if (*topParam == '\0' || *ptr != '\0')
++        {
++            messages::queryParameterValueTypeError(res, std::string(topParam),
++                                                   "$top");
++            return false;
++        }
++        if (top < 1 || top > maxEntriesPerPage)
++        {
++
++            messages::queryParameterOutOfRange(
++                res, std::to_string(top), "$top",
++                "1-" + std::to_string(maxEntriesPerPage));
++            return false;
++        }
++    }
++    return true;
++}
++
++static bool getUniqueEntryID(sd_journal *journal, std::string &entryID)
++{
++    int ret = 0;
++    static uint64_t prevTs = 0;
++    static int index = 0;
++    // Get the entry timestamp
++    uint64_t curTs = 0;
++    ret = sd_journal_get_realtime_usec(journal, &curTs);
++    if (ret < 0)
++    {
++        BMCWEB_LOG_ERROR << "Failed to read entry timestamp: "
++                         << strerror(-ret);
++        return false;
++    }
++    // If the timestamp isn't unique, increment the index
++    if (curTs == prevTs)
++    {
++        index++;
++    }
++    else
++    {
++        // Otherwise, reset it
++        index = 0;
++    }
++    // Save the timestamp
++    prevTs = curTs;
++
++    entryID = std::to_string(curTs);
++    if (index > 0)
++    {
++        entryID += "_" + std::to_string(index);
++    }
++    return true;
++}
++
++static bool getTimestampFromID(crow::Response &res, const std::string &entryID,
++                               uint64_t &timestamp, uint16_t &index)
++{
++    if (entryID.empty())
++    {
++        return false;
++    }
++    // Convert the unique ID back to a timestamp to find the entry
++    boost::string_view tsStr(entryID);
++
++    auto underscorePos = tsStr.find("_");
++    if (underscorePos != tsStr.npos)
++    {
++        // Timestamp has an index
++        tsStr.remove_suffix(tsStr.size() - underscorePos);
++        boost::string_view indexStr(entryID);
++        indexStr.remove_prefix(underscorePos + 1);
++        std::size_t pos;
++        try
++        {
++            index = std::stoul(indexStr.to_string(), &pos);
++        }
++        catch (std::invalid_argument)
++        {
++            messages::resourceMissingAtURI(res, entryID);
++            return false;
++        }
++        catch (std::out_of_range)
++        {
++            messages::resourceMissingAtURI(res, entryID);
++            return false;
++        }
++        if (pos != indexStr.size())
++        {
++            messages::resourceMissingAtURI(res, entryID);
++            return false;
++        }
++    }
++    // Timestamp has no index
++    std::size_t pos;
++    try
++    {
++        timestamp = std::stoull(tsStr.to_string(), &pos);
++    }
++    catch (std::invalid_argument)
++    {
++        messages::resourceMissingAtURI(res, entryID);
++        return false;
++    }
++    catch (std::out_of_range)
++    {
++        messages::resourceMissingAtURI(res, entryID);
++        return false;
++    }
++    if (pos != tsStr.size())
++    {
++        messages::resourceMissingAtURI(res, entryID);
++        return false;
++    }
++    return true;
++}
++
++class SystemLogServiceCollection : public Node
++{
++  public:
++    template <typename CrowApp>
++    SystemLogServiceCollection(CrowApp &app) :
++        Node(app, "/redfish/v1/Systems/system/LogServices/")
++    {
++        entityPrivileges = {
++            {boost::beast::http::verb::get, {{"Login"}}},
++            {boost::beast::http::verb::head, {{"Login"}}},
++            {boost::beast::http::verb::patch, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::put, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::delete_, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::post, {{"ConfigureManager"}}}};
++    }
++
++  private:
++    /**
++     * Functions triggers appropriate requests on DBus
++     */
++    void doGet(crow::Response &res, const crow::Request &req,
++               const std::vector<std::string> &params) override
++    {
++        std::shared_ptr<AsyncResp> asyncResp = std::make_shared<AsyncResp>(res);
++        // Collections don't include the static data added by SubRoute because
++        // it has a duplicate entry for members
++        asyncResp->res.jsonValue["@odata.type"] =
++            "#LogServiceCollection.LogServiceCollection";
++        asyncResp->res.jsonValue["@odata.context"] =
++            "/redfish/v1/$metadata#LogServiceCollection.LogServiceCollection";
++        asyncResp->res.jsonValue["@odata.id"] =
++            "/redfish/v1/Systems/system/LogServices";
++        asyncResp->res.jsonValue["Name"] = "System Log Services Collection";
++        asyncResp->res.jsonValue["Description"] =
++            "Collection of LogServices for this Computer System";
++        nlohmann::json &logServiceArray = asyncResp->res.jsonValue["Members"];
++        logServiceArray = nlohmann::json::array();
++        logServiceArray.push_back(
++            {{"@odata.id", "/redfish/v1/Systems/system/LogServices/EventLog"}});
++#ifdef BMCWEB_ENABLE_REDFISH_CPU_LOG
++        logServiceArray.push_back(
++            {{"@odata.id", "/redfish/v1/Systems/system/LogServices/CpuLog"}});
++#endif
++        asyncResp->res.jsonValue["Members@odata.count"] =
++            logServiceArray.size();
++    }
++};
++
++class EventLogService : public Node
++{
++  public:
++    template <typename CrowApp>
++    EventLogService(CrowApp &app) :
++        Node(app, "/redfish/v1/Systems/system/LogServices/EventLog/")
++    {
++        entityPrivileges = {
++            {boost::beast::http::verb::get, {{"Login"}}},
++            {boost::beast::http::verb::head, {{"Login"}}},
++            {boost::beast::http::verb::patch, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::put, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::delete_, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::post, {{"ConfigureManager"}}}};
++    }
++
++  private:
++    void doGet(crow::Response &res, const crow::Request &req,
++               const std::vector<std::string> &params) override
++    {
++        std::shared_ptr<AsyncResp> asyncResp = std::make_shared<AsyncResp>(res);
++
++        asyncResp->res.jsonValue["@odata.id"] =
++            "/redfish/v1/Systems/system/LogServices/EventLog";
++        asyncResp->res.jsonValue["@odata.type"] =
++            "#LogService.v1_1_0.LogService";
++        asyncResp->res.jsonValue["@odata.context"] =
++            "/redfish/v1/$metadata#LogService.LogService";
++        asyncResp->res.jsonValue["Name"] = "Event Log Service";
++        asyncResp->res.jsonValue["Description"] = "System Event Log Service";
++        asyncResp->res.jsonValue["Id"] = "Event Log";
++        asyncResp->res.jsonValue["OverWritePolicy"] = "WrapsWhenFull";
++        asyncResp->res.jsonValue["Entries"] = {
++            {"@odata.id",
++             "/redfish/v1/Systems/system/LogServices/EventLog/Entries"}};
++    }
++};
++
++static int fillEventLogEntryJson(const std::string &bmcLogEntryID,
++                                 const boost::string_view &messageID,
++                                 sd_journal *journal,
++                                 nlohmann::json &bmcLogEntryJson)
++{
++    // Get the Log Entry contents
++    int ret = 0;
++
++    boost::string_view msg;
++    ret = getJournalMetadata(journal, "MESSAGE", msg);
++    if (ret < 0)
++    {
++        BMCWEB_LOG_ERROR << "Failed to read MESSAGE field: " << strerror(-ret);
++        return 1;
++    }
++
++    // Get the severity from the PRIORITY field
++    int severity = 8; // Default to an invalid priority
++    ret = getJournalMetadata(journal, "PRIORITY", 10, severity);
++    if (ret < 0)
++    {
++        BMCWEB_LOG_ERROR << "Failed to read PRIORITY field: " << strerror(-ret);
++        return 1;
++    }
++
++    // Get the MessageArgs from the journal entry by finding all of the
++    // REDFISH_MESSAGE_ARG_x fields
++    const void *data;
++    size_t length;
++    std::vector<std::string> messageArgs;
++    SD_JOURNAL_FOREACH_DATA(journal, data, length)
++    {
++        boost::string_view field(static_cast<const char *>(data), length);
++        if (field.starts_with("REDFISH_MESSAGE_ARG_"))
++        {
++            // Get the Arg number from the field name
++            field.remove_prefix(sizeof("REDFISH_MESSAGE_ARG_") - 1);
++            if (field.empty())
++            {
++                continue;
++            }
++            int argNum = std::strtoul(field.data(), nullptr, 10);
++            if (argNum == 0)
++            {
++                continue;
++            }
++            // Get the Arg value after the "=" character.
++            field.remove_prefix(std::min(field.find("=") + 1, field.size()));
++            // Make sure we have enough space in messageArgs
++            if (argNum > messageArgs.size())
++            {
++                messageArgs.resize(argNum);
++            }
++            messageArgs[argNum - 1] = field.to_string();
++        }
++    }
++
++    // Get the Created time from the timestamp
++    std::string entryTimeStr;
++    if (!getEntryTimestamp(journal, entryTimeStr))
++    {
++        return 1;
++    }
++
++    // Fill in the log entry with the gathered data
++    bmcLogEntryJson = {
++        {"@odata.type", "#LogEntry.v1_3_0.LogEntry"},
++        {"@odata.context", "/redfish/v1/$metadata#LogEntry.LogEntry"},
++        {"@odata.id",
++         "/redfish/v1/Systems/system/LogServices/EventLog/Entries/" +
++             bmcLogEntryID},
++        {"Name", "System Event Log Entry"},
++        {"Id", bmcLogEntryID},
++        {"Message", msg},
++        {"MessageId", messageID},
++        {"MessageArgs", std::move(messageArgs)},
++        {"EntryType", "Event"},
++        {"Severity",
++         severity <= 2 ? "Critical"
++                       : severity <= 4 ? "Warning" : severity <= 7 ? "OK" : ""},
++        {"Created", std::move(entryTimeStr)}};
++    return 0;
++}
++
++class EventLogEntryCollection : public Node
++{
++  public:
++    template <typename CrowApp>
++    EventLogEntryCollection(CrowApp &app) :
++        Node(app, "/redfish/v1/Systems/system/LogServices/EventLog/Entries/")
++    {
++        entityPrivileges = {
++            {boost::beast::http::verb::get, {{"Login"}}},
++            {boost::beast::http::verb::head, {{"Login"}}},
++            {boost::beast::http::verb::patch, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::put, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::delete_, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::post, {{"ConfigureManager"}}}};
++    }
++
++  private:
++    void doGet(crow::Response &res, const crow::Request &req,
++               const std::vector<std::string> &params) override
++    {
++        std::shared_ptr<AsyncResp> asyncResp = std::make_shared<AsyncResp>(res);
++        long skip = 0;
++        long top = maxEntriesPerPage; // Show max entries by default
++        if (!getSkipParam(asyncResp->res, req, skip))
++        {
++            return;
++        }
++        if (!getTopParam(asyncResp->res, req, top))
++        {
++            return;
++        }
++        // Collections don't include the static data added by SubRoute because
++        // it has a duplicate entry for members
++        asyncResp->res.jsonValue["@odata.type"] =
++            "#LogEntryCollection.LogEntryCollection";
++        asyncResp->res.jsonValue["@odata.context"] =
++            "/redfish/v1/$metadata#LogEntryCollection.LogEntryCollection";
++        asyncResp->res.jsonValue["@odata.id"] =
++            "/redfish/v1/Systems/system/LogServices/EventLog/Entries";
++        asyncResp->res.jsonValue["Name"] = "System Event Log Entries";
++        asyncResp->res.jsonValue["Description"] =
++            "Collection of System Event Log Entries";
++        nlohmann::json &logEntryArray = asyncResp->res.jsonValue["Members"];
++        logEntryArray = nlohmann::json::array();
++
++        // Go through the journal and create a unique ID for each entry
++        sd_journal *journalTmp = nullptr;
++        int ret = sd_journal_open(&journalTmp, SD_JOURNAL_LOCAL_ONLY);
++        if (ret < 0)
++        {
++            BMCWEB_LOG_ERROR << "failed to open journal: " << strerror(-ret);
++            messages::internalError(asyncResp->res);
++            return;
++        }
++        std::unique_ptr<sd_journal, decltype(&sd_journal_close)> journal(
++            journalTmp, sd_journal_close);
++        journalTmp = nullptr;
++        uint64_t entryCount = 0;
++        SD_JOURNAL_FOREACH(journal.get())
++        {
++            // Look for only journal entries that contain a REDFISH_MESSAGE_ID
++            // field
++            boost::string_view messageID;
++            ret = getJournalMetadata(journal.get(), "REDFISH_MESSAGE_ID",
++                                     messageID);
++            if (ret < 0)
++            {
++                continue;
++            }
++
++            entryCount++;
++            // Handle paging using skip (number of entries to skip from the
++            // start) and top (number of entries to display)
++            if (entryCount <= skip || entryCount > skip + top)
++            {
++                continue;
++            }
++
++            std::string idStr;
++            if (!getUniqueEntryID(journal.get(), idStr))
++            {
++                continue;
++            }
++
++            logEntryArray.push_back({});
++            nlohmann::json &bmcLogEntry = logEntryArray.back();
++            if (fillEventLogEntryJson(idStr, messageID, journal.get(),
++                                      bmcLogEntry) != 0)
++            {
++                messages::internalError(asyncResp->res);
++                return;
++            }
++        }
++        asyncResp->res.jsonValue["Members@odata.count"] = entryCount;
++        if (skip + top < entryCount)
++        {
++            asyncResp->res.jsonValue["Members@odata.nextLink"] =
++                "/redfish/v1/Managers/bmc/LogServices/BmcLog/Entries?$skip=" +
++                std::to_string(skip + top);
++        }
++    }
++};
++
++class EventLogEntry : public Node
++{
++  public:
++    EventLogEntry(CrowApp &app) :
++        Node(app,
++             "/redfish/v1/Systems/system/LogServices/EventLog/Entries/<str>/",
++             std::string())
++    {
++        entityPrivileges = {
++            {boost::beast::http::verb::get, {{"Login"}}},
++            {boost::beast::http::verb::head, {{"Login"}}},
++            {boost::beast::http::verb::patch, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::put, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::delete_, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::post, {{"ConfigureManager"}}}};
++    }
++
++  private:
++    void doGet(crow::Response &res, const crow::Request &req,
++               const std::vector<std::string> &params) override
++    {
++        std::shared_ptr<AsyncResp> asyncResp = std::make_shared<AsyncResp>(res);
++        if (params.size() != 1)
++        {
++            messages::internalError(asyncResp->res);
++            return;
++        }
++        const std::string &entryID = params[0];
++        // Convert the unique ID back to a timestamp to find the entry
++        uint64_t ts = 0;
++        uint16_t index = 0;
++        if (!getTimestampFromID(asyncResp->res, entryID, ts, index))
++        {
++            return;
++        }
++
++        sd_journal *journalTmp = nullptr;
++        int ret = sd_journal_open(&journalTmp, SD_JOURNAL_LOCAL_ONLY);
++        if (ret < 0)
++        {
++            BMCWEB_LOG_ERROR << "failed to open journal: " << strerror(-ret);
++            messages::internalError(asyncResp->res);
++            return;
++        }
++        std::unique_ptr<sd_journal, decltype(&sd_journal_close)> journal(
++            journalTmp, sd_journal_close);
++        journalTmp = nullptr;
++        // Go to the timestamp in the log and move to the entry at the index
++        ret = sd_journal_seek_realtime_usec(journal.get(), ts);
++        for (int i = 0; i <= index; i++)
++        {
++            sd_journal_next(journal.get());
++        }
++        // Confirm that the entry ID matches what was requested
++        std::string idStr;
++        if (!getUniqueEntryID(journal.get(), idStr) || idStr != entryID)
++        {
++            messages::resourceMissingAtURI(asyncResp->res, entryID);
++            return;
++        }
++
++        // only use journal entries that contain a REDFISH_MESSAGE_ID field
++        boost::string_view messageID;
++        ret =
++            getJournalMetadata(journal.get(), "REDFISH_MESSAGE_ID", messageID);
++        if (ret < 0)
++        {
++            messages::resourceNotFound(asyncResp->res, "LogEntry", "system");
++            return;
++        }
++
++        if (fillEventLogEntryJson(entryID, messageID, journal.get(),
++                                  asyncResp->res.jsonValue) != 0)
++        {
++            messages::internalError(asyncResp->res);
++            return;
++        }
++    }
++};
++
++class BMCLogServiceCollection : public Node
++{
++  public:
++    template <typename CrowApp>
++    BMCLogServiceCollection(CrowApp &app) :
++        Node(app, "/redfish/v1/Managers/rmc/LogServices/")
++    {
++        entityPrivileges = {
++            {boost::beast::http::verb::get, {{"Login"}}},
++            {boost::beast::http::verb::head, {{"Login"}}},
++            {boost::beast::http::verb::patch, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::put, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::delete_, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::post, {{"ConfigureManager"}}}};
++    }
++
++  private:
++    /**
++     * Functions triggers appropriate requests on DBus
++     */
++    void doGet(crow::Response &res, const crow::Request &req,
++               const std::vector<std::string> &params) override
++    {
++        std::shared_ptr<AsyncResp> asyncResp = std::make_shared<AsyncResp>(res);
++        // Collections don't include the static data added by SubRoute because
++        // it has a duplicate entry for members
++        asyncResp->res.jsonValue["@odata.type"] =
++            "#LogServiceCollection.LogServiceCollection";
++        asyncResp->res.jsonValue["@odata.context"] =
++            "/redfish/v1/$metadata#LogServiceCollection.LogServiceCollection";
++        asyncResp->res.jsonValue["@odata.id"] =
++            "/redfish/v1/Managers/bmc/LogServices";
++        asyncResp->res.jsonValue["Name"] = "Open BMC Log Services Collection";
++        asyncResp->res.jsonValue["Description"] =
++            "Collection of LogServices for this Manager";
++        nlohmann::json &logServiceArray = asyncResp->res.jsonValue["Members"];
++        logServiceArray = nlohmann::json::array();
++#ifdef BMCWEB_ENABLE_REDFISH_BMC_JOURNAL
++        logServiceArray.push_back(
++            {{"@odata.id", "/redfish/v1/Managers/bmc/LogServices/Journal"}});
++#endif
++        asyncResp->res.jsonValue["Members@odata.count"] =
++            logServiceArray.size();
++    }
++};
++
++class BMCJournalLogService : public Node
++{
++  public:
++    template <typename CrowApp>
++    BMCJournalLogService(CrowApp &app) :
++        Node(app, "/redfish/v1/Managers/rmc/LogServices/Journal/")
++    {
++        entityPrivileges = {
++            {boost::beast::http::verb::get, {{"Login"}}},
++            {boost::beast::http::verb::head, {{"Login"}}},
++            {boost::beast::http::verb::patch, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::put, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::delete_, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::post, {{"ConfigureManager"}}}};
++    }
++
++  private:
++    void doGet(crow::Response &res, const crow::Request &req,
++               const std::vector<std::string> &params) override
++    {
++        std::shared_ptr<AsyncResp> asyncResp = std::make_shared<AsyncResp>(res);
++        asyncResp->res.jsonValue["@odata.type"] =
++            "#LogService.v1_1_0.LogService";
++        asyncResp->res.jsonValue["@odata.id"] =
++            "/redfish/v1/Managers/bmc/LogServices/Journal";
++        asyncResp->res.jsonValue["@odata.context"] =
++            "/redfish/v1/$metadata#LogService.LogService";
++        asyncResp->res.jsonValue["Name"] = "Open BMC Journal Log Service";
++        asyncResp->res.jsonValue["Description"] = "BMC Journal Log Service";
++        asyncResp->res.jsonValue["Id"] = "BMC Journal";
++        asyncResp->res.jsonValue["OverWritePolicy"] = "WrapsWhenFull";
++        asyncResp->res.jsonValue["Entries"] = {
++            {"@odata.id",
++             "/redfish/v1/Managers/bmc/LogServices/Journal/Entries/"}};
++    }
++};
++
++static int fillBMCJournalLogEntryJson(const std::string &bmcJournalLogEntryID,
++                                      sd_journal *journal,
++                                      nlohmann::json &bmcJournalLogEntryJson)
++{
++    // Get the Log Entry contents
++    int ret = 0;
++
++    boost::string_view msg;
++    ret = getJournalMetadata(journal, "MESSAGE", msg);
++    if (ret < 0)
++    {
++        BMCWEB_LOG_ERROR << "Failed to read MESSAGE field: " << strerror(-ret);
++        return 1;
++    }
++
++    // Get the severity from the PRIORITY field
++    int severity = 8; // Default to an invalid priority
++    ret = getJournalMetadata(journal, "PRIORITY", 10, severity);
++    if (ret < 0)
++    {
++        BMCWEB_LOG_ERROR << "Failed to read PRIORITY field: " << strerror(-ret);
++        return 1;
++    }
++
++    // Get the Created time from the timestamp
++    std::string entryTimeStr;
++    if (!getEntryTimestamp(journal, entryTimeStr))
++    {
++        return 1;
++    }
++
++    // Fill in the log entry with the gathered data
++    bmcJournalLogEntryJson = {
++        {"@odata.type", "#LogEntry.v1_3_0.LogEntry"},
++        {"@odata.context", "/redfish/v1/$metadata#LogEntry.LogEntry"},
++        {"@odata.id", "/redfish/v1/Managers/bmc/LogServices/Journal/Entries/" +
++                          bmcJournalLogEntryID},
++        {"Name", "BMC Journal Entry"},
++        {"Id", bmcJournalLogEntryID},
++        {"Message", msg},
++        {"EntryType", "Oem"},
++        {"Severity",
++         severity <= 2 ? "Critical"
++                       : severity <= 4 ? "Warning" : severity <= 7 ? "OK" : ""},
++        {"OemRecordFormat", "Intel BMC Journal Entry"},
++        {"Created", std::move(entryTimeStr)}};
++    return 0;
++}
++
++class BMCJournalLogEntryCollection : public Node
++{
++  public:
++    template <typename CrowApp>
++    BMCJournalLogEntryCollection(CrowApp &app) :
++        Node(app, "/redfish/v1/Managers/rmc/LogServices/Journal/Entries/")
++    {
++        entityPrivileges = {
++            {boost::beast::http::verb::get, {{"Login"}}},
++            {boost::beast::http::verb::head, {{"Login"}}},
++            {boost::beast::http::verb::patch, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::put, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::delete_, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::post, {{"ConfigureManager"}}}};
++    }
++
++  private:
++    void doGet(crow::Response &res, const crow::Request &req,
++               const std::vector<std::string> &params) override
++    {
++        std::shared_ptr<AsyncResp> asyncResp = std::make_shared<AsyncResp>(res);
++        static constexpr const long maxEntriesPerPage = 1000;
++        long skip = 0;
++        long top = maxEntriesPerPage; // Show max entries by default
++        if (!getSkipParam(asyncResp->res, req, skip))
++        {
++            return;
++        }
++        if (!getTopParam(asyncResp->res, req, top))
++        {
++            return;
++        }
++        // Collections don't include the static data added by SubRoute because
++        // it has a duplicate entry for members
++        asyncResp->res.jsonValue["@odata.type"] =
++            "#LogEntryCollection.LogEntryCollection";
++        asyncResp->res.jsonValue["@odata.id"] =
++            "/redfish/v1/Managers/bmc/LogServices/Journal/Entries";
++        asyncResp->res.jsonValue["@odata.context"] =
++            "/redfish/v1/$metadata#LogEntryCollection.LogEntryCollection";
++        asyncResp->res.jsonValue["@odata.id"] =
++            "/redfish/v1/Managers/bmc/LogServices/Journal/Entries";
++        asyncResp->res.jsonValue["Name"] = "Open BMC Journal Entries";
++        asyncResp->res.jsonValue["Description"] =
++            "Collection of BMC Journal Entries";
++        asyncResp->res.jsonValue["@odata.id"] =
++            "/redfish/v1/Managers/bmc/LogServices/BmcLog/Entries";
++        nlohmann::json &logEntryArray = asyncResp->res.jsonValue["Members"];
++        logEntryArray = nlohmann::json::array();
++
++        // Go through the journal and use the timestamp to create a unique ID
++        // for each entry
++        sd_journal *journalTmp = nullptr;
++        int ret = sd_journal_open(&journalTmp, SD_JOURNAL_LOCAL_ONLY);
++        if (ret < 0)
++        {
++            BMCWEB_LOG_ERROR << "failed to open journal: " << strerror(-ret);
++            messages::internalError(asyncResp->res);
++            return;
++        }
++        std::unique_ptr<sd_journal, decltype(&sd_journal_close)> journal(
++            journalTmp, sd_journal_close);
++        journalTmp = nullptr;
++        uint64_t entryCount = 0;
++        SD_JOURNAL_FOREACH(journal.get())
++        {
++            entryCount++;
++            // Handle paging using skip (number of entries to skip from the
++            // start) and top (number of entries to display)
++            if (entryCount <= skip || entryCount > skip + top)
++            {
++                continue;
++            }
++
++            std::string idStr;
++            if (!getUniqueEntryID(journal.get(), idStr))
++            {
++                continue;
++            }
++
++            logEntryArray.push_back({});
++            nlohmann::json &bmcJournalLogEntry = logEntryArray.back();
++            if (fillBMCJournalLogEntryJson(idStr, journal.get(),
++                                           bmcJournalLogEntry) != 0)
++            {
++                messages::internalError(asyncResp->res);
++                return;
++            }
++        }
++        asyncResp->res.jsonValue["Members@odata.count"] = entryCount;
++        if (skip + top < entryCount)
++        {
++            asyncResp->res.jsonValue["Members@odata.nextLink"] =
++                "/redfish/v1/Managers/bmc/LogServices/Journal/Entries?$skip=" +
++                std::to_string(skip + top);
++        }
++    }
++};
++
++class BMCJournalLogEntry : public Node
++{
++  public:
++    BMCJournalLogEntry(CrowApp &app) :
++        Node(app, "/redfish/v1/Managers/rmc/LogServices/Journal/Entries/<str>/",
++             std::string())
++    {
++        entityPrivileges = {
++            {boost::beast::http::verb::get, {{"Login"}}},
++            {boost::beast::http::verb::head, {{"Login"}}},
++            {boost::beast::http::verb::patch, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::put, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::delete_, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::post, {{"ConfigureManager"}}}};
++    }
++
++  private:
++    void doGet(crow::Response &res, const crow::Request &req,
++               const std::vector<std::string> &params) override
++    {
++        std::shared_ptr<AsyncResp> asyncResp = std::make_shared<AsyncResp>(res);
++        if (params.size() != 1)
++        {
++            messages::internalError(asyncResp->res);
++            return;
++        }
++        const std::string &entryID = params[0];
++        // Convert the unique ID back to a timestamp to find the entry
++        uint64_t ts = 0;
++        uint16_t index = 0;
++        if (!getTimestampFromID(asyncResp->res, entryID, ts, index))
++        {
++            return;
++        }
++
++        sd_journal *journalTmp = nullptr;
++        int ret = sd_journal_open(&journalTmp, SD_JOURNAL_LOCAL_ONLY);
++        if (ret < 0)
++        {
++            BMCWEB_LOG_ERROR << "failed to open journal: " << strerror(-ret);
++            messages::internalError(asyncResp->res);
++            return;
++        }
++        std::unique_ptr<sd_journal, decltype(&sd_journal_close)> journal(
++            journalTmp, sd_journal_close);
++        journalTmp = nullptr;
++        // Go to the timestamp in the log and move to the entry at the index
++        ret = sd_journal_seek_realtime_usec(journal.get(), ts);
++        for (int i = 0; i <= index; i++)
++        {
++            sd_journal_next(journal.get());
++        }
++        // Confirm that the entry ID matches what was requested
++        std::string idStr;
++        if (!getUniqueEntryID(journal.get(), idStr) || idStr != entryID)
++        {
++            messages::resourceMissingAtURI(asyncResp->res, entryID);
++            return;
++        }
++
++        if (fillBMCJournalLogEntryJson(entryID, journal.get(),
++                                       asyncResp->res.jsonValue) != 0)
++        {
++            messages::internalError(asyncResp->res);
++            return;
++        }
++    }
++};
++
++class CPULogService : public Node
++{
++  public:
++    template <typename CrowApp>
++    CPULogService(CrowApp &app) :
++        Node(app, "/redfish/v1/Systems/system/LogServices/CpuLog/")
++    {
++        entityPrivileges = {
++            {boost::beast::http::verb::get, {{"Login"}}},
++            {boost::beast::http::verb::head, {{"Login"}}},
++            {boost::beast::http::verb::patch, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::put, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::delete_, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::post, {{"ConfigureManager"}}}};
++    }
++
++  private:
++    /**
++     * Functions triggers appropriate requests on DBus
++     */
++    void doGet(crow::Response &res, const crow::Request &req,
++               const std::vector<std::string> &params) override
++    {
++        std::shared_ptr<AsyncResp> asyncResp = std::make_shared<AsyncResp>(res);
++        // Copy over the static data to include the entries added by SubRoute
++        asyncResp->res.jsonValue["@odata.id"] =
++            "/redfish/v1/Systems/system/LogServices/CpuLog";
++        asyncResp->res.jsonValue["@odata.type"] =
++            "#LogService.v1_1_0.LogService";
++        asyncResp->res.jsonValue["@odata.context"] =
++            "/redfish/v1/$metadata#LogService.LogService";
++        asyncResp->res.jsonValue["Name"] = "Open BMC CPU Log Service";
++        asyncResp->res.jsonValue["Description"] = "CPU Log Service";
++        asyncResp->res.jsonValue["Id"] = "CPU Log";
++        asyncResp->res.jsonValue["OverWritePolicy"] = "WrapsWhenFull";
++        asyncResp->res.jsonValue["MaxNumberOfRecords"] = 3;
++        asyncResp->res.jsonValue["Entries"] = {
++            {"@odata.id",
++             "/redfish/v1/Managers/bmc/LogServices/CpuLog/Entries"}};
++        asyncResp->res.jsonValue["Actions"] = {
++            {"Oem",
++             {{"#CpuLog.Immediate",
++               {{"target", "/redfish/v1/Systems/system/LogServices/CpuLog/"
++                           "Actions/Oem/CpuLog.Immediate"}}}}}};
++
++#ifdef BMCWEB_ENABLE_REDFISH_RAW_PECI
++        asyncResp->res.jsonValue["Actions"]["Oem"].push_back(
++            {"#CpuLog.SendRawPeci",
++             {{"target", "/redfish/v1/Systems/system/LogServices/CpuLog/"
++                         "Actions/Oem/CpuLog.SendRawPeci"}}});
++#endif
++    }
++};
++
++class CPULogEntryCollection : public Node
++{
++  public:
++    template <typename CrowApp>
++    CPULogEntryCollection(CrowApp &app) :
++        Node(app, "/redfish/v1/Systems/system/LogServices/CpuLog/Entries/")
++    {
++        entityPrivileges = {
++            {boost::beast::http::verb::get, {{"Login"}}},
++            {boost::beast::http::verb::head, {{"Login"}}},
++            {boost::beast::http::verb::patch, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::put, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::delete_, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::post, {{"ConfigureManager"}}}};
++    }
++
++  private:
++    /**
++     * Functions triggers appropriate requests on DBus
++     */
++    void doGet(crow::Response &res, const crow::Request &req,
++               const std::vector<std::string> &params) override
++    {
++        std::shared_ptr<AsyncResp> asyncResp = std::make_shared<AsyncResp>(res);
++        // Collections don't include the static data added by SubRoute because
++        // it has a duplicate entry for members
++        auto getLogEntriesCallback = [asyncResp](
++                                         const boost::system::error_code ec,
++                                         const std::vector<std::string> &resp) {
++            if (ec)
++            {
++                if (ec.value() !=
++                    boost::system::errc::no_such_file_or_directory)
++                {
++                    BMCWEB_LOG_DEBUG << "failed to get entries ec: "
++                                     << ec.message();
++                    messages::internalError(asyncResp->res);
++                    return;
++                }
++            }
++            asyncResp->res.jsonValue["@odata.type"] =
++                "#LogEntryCollection.LogEntryCollection";
++            asyncResp->res.jsonValue["@odata.id"] =
++                "/redfish/v1/Systems/system/LogServices/CpuLog/Entries";
++            asyncResp->res.jsonValue["@odata.context"] =
++                "/redfish/v1/"
++                "$metadata#LogEntryCollection.LogEntryCollection";
++            asyncResp->res.jsonValue["Name"] = "Open BMC CPU Log Entries";
++            asyncResp->res.jsonValue["Description"] =
++                "Collection of CPU Log Entries";
++            nlohmann::json &logEntryArray = asyncResp->res.jsonValue["Members"];
++            logEntryArray = nlohmann::json::array();
++            for (const std::string &objpath : resp)
++            {
++                // Don't list the immediate log
++                if (objpath.compare(cpuLogImmediatePath) == 0)
++                {
++                    continue;
++                }
++                std::size_t lastPos = objpath.rfind("/");
++                if (lastPos != std::string::npos)
++                {
++                    logEntryArray.push_back(
++                        {{"@odata.id", "/redfish/v1/Systems/system/LogServices/"
++                                       "CpuLog/Entries/" +
++                                           objpath.substr(lastPos + 1)}});
++                }
++            }
++            asyncResp->res.jsonValue["Members@odata.count"] =
++                logEntryArray.size();
++        };
++        crow::connections::systemBus->async_method_call(
++            std::move(getLogEntriesCallback),
++            "xyz.openbmc_project.ObjectMapper",
++            "/xyz/openbmc_project/object_mapper",
++            "xyz.openbmc_project.ObjectMapper", "GetSubTreePaths", "", 0,
++            std::array<const char *, 1>{cpuLogInterface});
++    }
++};
++
++std::string getLogCreatedTime(const nlohmann::json &cpuLog)
++{
++    nlohmann::json::const_iterator cdIt = cpuLog.find("crashlog_data");
++    if (cdIt != cpuLog.end())
++    {
++        nlohmann::json::const_iterator siIt = cdIt->find("SYSTEM_INFO");
++        if (siIt != cdIt->end())
++        {
++            nlohmann::json::const_iterator tsIt = siIt->find("timestamp");
++            if (tsIt != siIt->end())
++            {
++                const std::string *logTime =
++                    tsIt->get_ptr<const std::string *>();
++                if (logTime != nullptr)
++                {
++                    return *logTime;
++                }
++            }
++        }
++    }
++    BMCWEB_LOG_DEBUG << "failed to find log timestamp";
++
++    return std::string();
++}
++
++class CPULogEntry : public Node
++{
++  public:
++    CPULogEntry(CrowApp &app) :
++        Node(app,
++             "/redfish/v1/Systems/system/LogServices/CpuLog/Entries/<str>/",
++             std::string())
++    {
++        entityPrivileges = {
++            {boost::beast::http::verb::get, {{"Login"}}},
++            {boost::beast::http::verb::head, {{"Login"}}},
++            {boost::beast::http::verb::patch, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::put, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::delete_, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::post, {{"ConfigureManager"}}}};
++    }
++
++  private:
++    void doGet(crow::Response &res, const crow::Request &req,
++               const std::vector<std::string> &params) override
++    {
++        std::shared_ptr<AsyncResp> asyncResp = std::make_shared<AsyncResp>(res);
++        if (params.size() != 1)
++        {
++            messages::internalError(asyncResp->res);
++            return;
++        }
++        const uint8_t logId = std::atoi(params[0].c_str());
++        auto getStoredLogCallback = [asyncResp, logId](
++                                        const boost::system::error_code ec,
++                                        const std::variant<std::string> &resp) {
++            if (ec)
++            {
++                BMCWEB_LOG_DEBUG << "failed to get log ec: " << ec.message();
++                messages::internalError(asyncResp->res);
++                return;
++            }
++            const std::string *log = std::get_if<std::string>(&resp);
++            if (log == nullptr)
++            {
++                messages::internalError(asyncResp->res);
++                return;
++            }
++            nlohmann::json j = nlohmann::json::parse(*log, nullptr, false);
++            if (j.is_discarded())
++            {
++                messages::internalError(asyncResp->res);
++                return;
++            }
++            std::string t = getLogCreatedTime(j);
++            asyncResp->res.jsonValue = {
++                {"@odata.type", "#LogEntry.v1_3_0.LogEntry"},
++                {"@odata.context", "/redfish/v1/$metadata#LogEntry.LogEntry"},
++                {"@odata.id",
++                 "/redfish/v1/Systems/system/LogServices/CpuLog/Entries/" +
++                     std::to_string(logId)},
++                {"Name", "CPU Debug Log"},
++                {"Id", logId},
++                {"EntryType", "Oem"},
++                {"OemRecordFormat", "Intel CPU Log"},
++                {"Oem", {{"Intel", std::move(j)}}},
++                {"Created", std::move(t)}};
++        };
++        crow::connections::systemBus->async_method_call(
++            std::move(getStoredLogCallback), cpuLogObject,
++            cpuLogPath + std::string("/") + std::to_string(logId),
++            "org.freedesktop.DBus.Properties", "Get", cpuLogInterface, "Log");
++    }
++};
++
++class ImmediateCPULog : public Node
++{
++  public:
++    ImmediateCPULog(CrowApp &app) :
++        Node(app, "/redfish/v1/Systems/system/LogServices/CpuLog/Actions/Oem/"
++                  "CpuLog.Immediate/")
++    {
++        entityPrivileges = {
++            {boost::beast::http::verb::get, {{"Login"}}},
++            {boost::beast::http::verb::head, {{"Login"}}},
++            {boost::beast::http::verb::patch, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::put, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::delete_, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::post, {{"ConfigureManager"}}}};
++    }
++
++  private:
++    void doPost(crow::Response &res, const crow::Request &req,
++                const std::vector<std::string> &params) override
++    {
++        std::shared_ptr<AsyncResp> asyncResp = std::make_shared<AsyncResp>(res);
++        static std::unique_ptr<sdbusplus::bus::match::match>
++            immediateLogMatcher;
++
++        // Only allow one Immediate Log request at a time
++        if (immediateLogMatcher != nullptr)
++        {
++            asyncResp->res.addHeader("Retry-After", "30");
++            messages::serviceTemporarilyUnavailable(asyncResp->res, "30");
++            return;
++        }
++        // Make this static so it survives outside this method
++        static boost::asio::deadline_timer timeout(*req.ioService);
++
++        timeout.expires_from_now(boost::posix_time::seconds(30));
++        timeout.async_wait([asyncResp](const boost::system::error_code &ec) {
++            immediateLogMatcher = nullptr;
++            if (ec)
++            {
++                // operation_aborted is expected if timer is canceled before
++                // completion.
++                if (ec != boost::asio::error::operation_aborted)
++                {
++                    BMCWEB_LOG_ERROR << "Async_wait failed " << ec;
++                }
++                return;
++            }
++            BMCWEB_LOG_ERROR << "Timed out waiting for immediate log";
++
++            messages::internalError(asyncResp->res);
++        });
++
++        auto immediateLogMatcherCallback = [asyncResp](
++                                               sdbusplus::message::message &m) {
++            BMCWEB_LOG_DEBUG << "Immediate log available match fired";
++            boost::system::error_code ec;
++            timeout.cancel(ec);
++            if (ec)
++            {
++                BMCWEB_LOG_ERROR << "error canceling timer " << ec;
++            }
++            sdbusplus::message::object_path objPath;
++            boost::container::flat_map<
++                std::string, boost::container::flat_map<
++                                 std::string, std::variant<std::string>>>
++                interfacesAdded;
++            m.read(objPath, interfacesAdded);
++            const std::string *log = std::get_if<std::string>(
++                &interfacesAdded[cpuLogInterface]["Log"]);
++            if (log == nullptr)
++            {
++                messages::internalError(asyncResp->res);
++                // Careful with immediateLogMatcher.  It is a unique_ptr to the
++                // match object inside which this lambda is executing.  Once it
++                // is set to nullptr, the match object will be destroyed and the
++                // lambda will lose its context, including res, so it needs to
++                // be the last thing done.
++                immediateLogMatcher = nullptr;
++                return;
++            }
++            nlohmann::json j = nlohmann::json::parse(*log, nullptr, false);
++            if (j.is_discarded())
++            {
++                messages::internalError(asyncResp->res);
++                // Careful with immediateLogMatcher.  It is a unique_ptr to the
++                // match object inside which this lambda is executing.  Once it
++                // is set to nullptr, the match object will be destroyed and the
++                // lambda will lose its context, including res, so it needs to
++                // be the last thing done.
++                immediateLogMatcher = nullptr;
++                return;
++            }
++            std::string t = getLogCreatedTime(j);
++            asyncResp->res.jsonValue = {
++                {"@odata.type", "#LogEntry.v1_3_0.LogEntry"},
++                {"@odata.context", "/redfish/v1/$metadata#LogEntry.LogEntry"},
++                {"Name", "CPU Debug Log"},
++                {"EntryType", "Oem"},
++                {"OemRecordFormat", "Intel CPU Log"},
++                {"Oem", {{"Intel", std::move(j)}}},
++                {"Created", std::move(t)}};
++            // Careful with immediateLogMatcher.  It is a unique_ptr to the
++            // match object inside which this lambda is executing.  Once it is
++            // set to nullptr, the match object will be destroyed and the lambda
++            // will lose its context, including res, so it needs to be the last
++            // thing done.
++            immediateLogMatcher = nullptr;
++        };
++        immediateLogMatcher = std::make_unique<sdbusplus::bus::match::match>(
++            *crow::connections::systemBus,
++            sdbusplus::bus::match::rules::interfacesAdded() +
++                sdbusplus::bus::match::rules::argNpath(0, cpuLogImmediatePath),
++            std::move(immediateLogMatcherCallback));
++
++        auto generateImmediateLogCallback =
++            [asyncResp](const boost::system::error_code ec,
++                        const std::string &resp) {
++                if (ec)
++                {
++                    if (ec.value() ==
++                        boost::system::errc::operation_not_supported)
++                    {
++                        messages::resourceInStandby(asyncResp->res);
++                    }
++                    else
++                    {
++                        messages::internalError(asyncResp->res);
++                    }
++                    boost::system::error_code timeoutec;
++                    timeout.cancel(timeoutec);
++                    if (timeoutec)
++                    {
++                        BMCWEB_LOG_ERROR << "error canceling timer "
++                                         << timeoutec;
++                    }
++                    immediateLogMatcher = nullptr;
++                    return;
++                }
++            };
++        crow::connections::systemBus->async_method_call(
++            std::move(generateImmediateLogCallback), cpuLogObject, cpuLogPath,
++            cpuLogImmediateInterface, "GenerateImmediateLog");
++    }
++};
++
++class SendRawPECI : public Node
++{
++  public:
++    SendRawPECI(CrowApp &app) :
++        Node(app, "/redfish/v1/Systems/system/LogServices/CpuLog/Actions/Oem/"
++                  "CpuLog.SendRawPeci/")
++    {
++        entityPrivileges = {
++            {boost::beast::http::verb::get, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::head, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::patch, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::put, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::delete_, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::post, {{"ConfigureComponents"}}}};
++    }
++
++  private:
++    void doPost(crow::Response &res, const crow::Request &req,
++                const std::vector<std::string> &params) override
++    {
++        std::shared_ptr<AsyncResp> asyncResp = std::make_shared<AsyncResp>(res);
++        uint8_t clientAddress = 0;
++        uint8_t readLength = 0;
++        std::vector<uint8_t> peciCommand;
++        if (!json_util::readJson(req, res, "ClientAddress", clientAddress,
++                                 "ReadLength", readLength, "PECICommand",
++                                 peciCommand))
++        {
++            return;
++        }
++
++        // Callback to return the Raw PECI response
++        auto sendRawPECICallback =
++            [asyncResp](const boost::system::error_code ec,
++                        const std::vector<uint8_t> &resp) {
++                if (ec)
++                {
++                    BMCWEB_LOG_DEBUG << "failed to send PECI command ec: "
++                                     << ec.message();
++                    messages::internalError(asyncResp->res);
++                    return;
++                }
++                asyncResp->res.jsonValue = {{"Name", "PECI Command Response"},
++                                            {"PECIResponse", resp}};
++            };
++        // Call the SendRawPECI command with the provided data
++        crow::connections::systemBus->async_method_call(
++            std::move(sendRawPECICallback), cpuLogObject, cpuLogPath,
++            cpuLogRawPECIInterface, "SendRawPeci", clientAddress, readLength,
++            peciCommand);
++    }
++};
++
++} // namespace redfish
+diff --git a/redfish-core/lib/rmc_managers.hpp b/redfish-core/lib/rmc_managers.hpp
+new file mode 100644
+index 0000000..bd8a698
+--- /dev/null
++++ b/redfish-core/lib/rmc_managers.hpp
+@@ -0,0 +1,217 @@
++/*
++// Copyright (c) 2018 Intel Corporation
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++*/
++#pragma once
++
++#include "node.hpp"
++
++#include <boost/algorithm/string/replace.hpp>
++#include <dbus_utility.hpp>
++
++namespace redfish
++{
++
++/**
++ * ManagerActionsReset class supports handle POST method for Reset action.
++ * The class retrieves and sends data directly to dbus.
++ */
++class ManagerActionsReset : public Node
++{
++  public:
++    ManagerActionsReset(CrowApp& app) :
++        Node(app, "/redfish/v1/Managers/rmc/Actions/Manager.Reset/")
++    {
++        entityPrivileges = {
++            {boost::beast::http::verb::get, {{"Login"}}},
++            {boost::beast::http::verb::head, {{"Login"}}},
++            {boost::beast::http::verb::patch, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::put, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::delete_, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::post, {{"ConfigureManager"}}}};
++    }
++
++  private:
++    /**
++     * Function handles POST method request.
++     * Analyzes POST body message before sends Reset request data to dbus.
++     * OpenBMC allows for ResetType is GracefulRestart only.
++     */
++    void doPost(crow::Response& res, const crow::Request& req,
++                const std::vector<std::string>& params) override
++    {
++        std::string resetType;
++
++        if (!json_util::readJson(req, res, "ResetType", resetType))
++        {
++            return;
++        }
++
++        if (resetType != "GracefulRestart")
++        {
++            res.result(boost::beast::http::status::bad_request);
++            messages::actionParameterNotSupported(res, resetType, "ResetType");
++            BMCWEB_LOG_ERROR << "Request incorrect action parameter: "
++                             << resetType;
++            res.end();
++            return;
++        }
++        doBMCGracefulRestart(res, req, params);
++    }
++
++    /**
++     * Function transceives data with dbus directly.
++     * All BMC state properties will be retrieved before sending reset request.
++     */
++    void doBMCGracefulRestart(crow::Response& res, const crow::Request& req,
++                              const std::vector<std::string>& params)
++    {
++    }
++};
++
++class Manager : public Node
++{
++  public:
++    Manager(CrowApp& app) : Node(app, "/redfish/v1/Managers/rmc/")
++    {
++        uuid = app.template getMiddleware<crow::persistent_data::Middleware>()
++                   .systemUuid;
++        entityPrivileges = {
++            {boost::beast::http::verb::get, {{"Login"}}},
++            {boost::beast::http::verb::head, {{"Login"}}},
++            {boost::beast::http::verb::patch, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::put, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::delete_, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::post, {{"ConfigureManager"}}}};
++    }
++
++  private:
++    void doGet(crow::Response& res, const crow::Request& req,
++               const std::vector<std::string>& params) override
++    {
++        res.jsonValue["@odata.id"] = "/redfish/v1/Managers/rmc";
++        res.jsonValue["@odata.type"] = "#Manager.v1_3_0.Manager";
++        res.jsonValue["@odata.context"] =
++            "/redfish/v1/$metadata#Manager.Manager";
++        res.jsonValue["Id"] = "rmc";
++        res.jsonValue["Name"] = "OpenRmc Manager";
++        res.jsonValue["Description"] = "RackScale RMC";
++        res.jsonValue["PowerState"] = "On";
++        res.jsonValue["ManagerType"] = "RMC Manager";
++        res.jsonValue["UUID"] = uuid;
++        res.jsonValue["Model"] = "OpenRmc"; // TODO(ed), get model
++
++        res.jsonValue["NetworkProtocol"] = {
++            {"@odata.id", "/redfish/v1/Managers/rmc/NetworkProtocol"}};
++
++        res.jsonValue["EthernetInterfaces"] = {
++            {"@odata.id", "/redfish/v1/Managers/rmc/EthernetInterfaces"}};
++        // default oem data
++        nlohmann::json& oem = res.jsonValue["Oem"];
++        nlohmann::json& oemOpenrmc = oem["OpenRmc"];
++        oem["@odata.type"] = "#OemManager.Oem";
++        oem["@odata.id"] = "/redfish/v1/Managers/rmc#/Oem";
++        oem["@odata.context"] = "/redfish/v1/$metadata#OemManager.Oem";
++        oemOpenrmc["@odata.type"] = "#OemManager.OpenRmc";
++        oemOpenrmc["@odata.id"] = "/redfish/v1/Managers/rmc#/Oem/OpenRmc";
++        oemOpenrmc["@odata.context"] =
++            "/redfish/v1/$metadata#OemManager.OpenRmc";
++
++        // Update Actions object.
++        nlohmann::json& manager_reset =
++            res.jsonValue["Actions"]["#Manager.Reset"];
++        manager_reset["target"] =
++            "/redfish/v1/Managers/rmc/Actions/Manager.Reset";
++        manager_reset["ResetType@Redfish.AllowableValues"] = {
++            "GracefulRestart"};
++
++        res.jsonValue["FirmwareVersion"] = "2.1.71.0";
++        res.jsonValue["DateTime"] = getDateTime();
++
++        nlohmann::json& serialConsole = res.jsonValue["SerialConsole"];
++        serialConsole["ServiceEnabled"] = true;
++        serialConsole["MaxConcurrentSessions"] = 1;
++        serialConsole["ConnectTypesSupported"] = {{"SSH"}};
++
++        nlohmann::json& status = res.jsonValue["Status"];
++        status["State"] = "Enabled";
++        status["Health"] = "OK";
++        status["HealthRollup"] = {};
++
++        nlohmann::json& link = res.jsonValue["Links"];
++        link["ManagerForServers"] = {};
++        nlohmann::json& manageerForChassis = link["ManagerForChassis"];
++        manageerForChassis.push_back(
++            {{"@odata.id", "/redfish/v1/Chassis/chassis1"}});
++        manageerForChassis.push_back(
++            {{"@odata.id", "/redfish/v1/Chassis/chassis2"}});
++        manageerForChassis.push_back(
++            {{"@odata.id", "/redfish/v1/Chassis/chassis3"}});
++        link["ManagerInChassis"] = {};
++
++        res.end();
++    }
++
++    std::string getDateTime() const
++    {
++        std::array<char, 128> dateTime;
++        std::string redfishDateTime("0000-00-00T00:00:00Z00:00");
++        std::time_t time = std::time(nullptr);
++
++        if (std::strftime(dateTime.begin(), dateTime.size(), "%FT%T%z",
++                          std::localtime(&time)))
++        {
++            // insert the colon required by the ISO 8601 standard
++            redfishDateTime = std::string(dateTime.data());
++            redfishDateTime.insert(redfishDateTime.end() - 2, ':');
++        }
++
++        return redfishDateTime;
++    }
++
++    std::string uuid;
++};
++
++class ManagerCollection : public Node
++{
++  public:
++    ManagerCollection(CrowApp& app) : Node(app, "/redfish/v1/Managers/")
++    {
++        entityPrivileges = {
++            {boost::beast::http::verb::get, {{"Login"}}},
++            {boost::beast::http::verb::head, {{"Login"}}},
++            {boost::beast::http::verb::patch, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::put, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::delete_, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::post, {{"ConfigureManager"}}}};
++    }
++
++  private:
++    void doGet(crow::Response& res, const crow::Request& req,
++               const std::vector<std::string>& params) override
++    {
++        // Collections don't include the static data added by SubRoute
++        // because it has a duplicate entry for members
++        res.jsonValue["@odata.id"] = "/redfish/v1/Managers";
++        res.jsonValue["@odata.type"] = "#ManagerCollection.ManagerCollection";
++        res.jsonValue["@odata.context"] =
++            "/redfish/v1/$metadata#ManagerCollection.ManagerCollection";
++        res.jsonValue["Name"] = "Manager Collection";
++        res.jsonValue["Members@odata.count"] = 1;
++        res.jsonValue["Members"] = {
++            {{"@odata.id", "/redfish/v1/Managers/rmc"}}};
++        res.end();
++    }
++};
++} // namespace redfish
+diff --git a/redfish-core/lib/rmc_network_protocol.hpp b/redfish-core/lib/rmc_network_protocol.hpp
+new file mode 100644
+index 0000000..46f70d3
+--- /dev/null
++++ b/redfish-core/lib/rmc_network_protocol.hpp
+@@ -0,0 +1,221 @@
++/*
++// Copyright (c) 2018 Intel Corporation
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++*/
++#pragma once
++
++#include "error_messages.hpp"
++#include "node.hpp"
++
++#include <variant>
++
++namespace redfish
++{
++
++enum NetworkProtocolUnitStructFields
++{
++    NET_PROTO_UNIT_NAME,
++    NET_PROTO_UNIT_DESC,
++    NET_PROTO_UNIT_LOAD_STATE,
++    NET_PROTO_UNIT_ACTIVE_STATE,
++    NET_PROTO_UNIT_SUB_STATE,
++    NET_PROTO_UNIT_DEVICE,
++    NET_PROTO_UNIT_OBJ_PATH,
++    NET_PROTO_UNIT_ALWAYS_0,
++    NET_PROTO_UNIT_ALWAYS_EMPTY,
++    NET_PROTO_UNIT_ALWAYS_ROOT_PATH
++};
++
++enum NetworkProtocolListenResponseElements
++{
++    NET_PROTO_LISTEN_TYPE,
++    NET_PROTO_LISTEN_STREAM
++};
++
++/**
++ * @brief D-Bus Unit structure returned in array from ListUnits Method
++ */
++using UnitStruct =
++    std::tuple<std::string, std::string, std::string, std::string, std::string,
++               std::string, sdbusplus::message::object_path, uint32_t,
++               std::string, sdbusplus::message::object_path>;
++
++struct ServiceConfiguration
++{
++    const char* serviceName;
++    const char* socketPath;
++};
++
++const static boost::container::flat_map<const char*, ServiceConfiguration>
++    protocolToDBus{
++        {"SSH",
++         {"dropbear.service",
++          "/org/freedesktop/systemd1/unit/dropbear_2esocket"}},
++        {"HTTPS",
++         {"phosphor-gevent.service",
++          "/org/freedesktop/systemd1/unit/phosphor_2dgevent_2esocket"}},
++        {"IPMI",
++         {"phosphor-ipmi-net.service",
++          "/org/freedesktop/systemd1/unit/phosphor_2dipmi_2dnet_2esocket"}}};
++
++class NetworkProtocol : public Node
++{
++  public:
++    NetworkProtocol(CrowApp& app) :
++        Node(app, "/redfish/v1/Managers/rmc/NetworkProtocol")
++    {
++        entityPrivileges = {
++            {boost::beast::http::verb::get, {{"Login"}}},
++            {boost::beast::http::verb::head, {{"Login"}}},
++            {boost::beast::http::verb::patch, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::put, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::delete_, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::post, {{"ConfigureManager"}}}};
++    }
++
++  private:
++    void doGet(crow::Response& res, const crow::Request& req,
++               const std::vector<std::string>& params) override
++    {
++        std::shared_ptr<AsyncResp> asyncResp = std::make_shared<AsyncResp>(res);
++
++        getData(asyncResp);
++    }
++
++    std::string getHostName() const
++    {
++        std::string hostName;
++
++        std::array<char, HOST_NAME_MAX> hostNameCStr;
++        if (gethostname(hostNameCStr.data(), hostNameCStr.size()) == 0)
++        {
++            hostName = hostNameCStr.data();
++        }
++        return hostName;
++    }
++
++    void getData(const std::shared_ptr<AsyncResp>& asyncResp)
++    {
++        asyncResp->res.jsonValue["@odata.type"] =
++            "#ManagerNetworkProtocol.v1_1_0.ManagerNetworkProtocol";
++        asyncResp->res.jsonValue["@odata.id"] =
++            "/redfish/v1/Managers/bmc/NetworkProtocol";
++        asyncResp->res.jsonValue["@odata.context"] =
++            "/redfish/v1/"
++            "$metadata#ManagerNetworkProtocol.ManagerNetworkProtocol";
++        asyncResp->res.jsonValue["Id"] = "NetworkProtocol";
++        asyncResp->res.jsonValue["Name"] = "Manager Network Protocol";
++        asyncResp->res.jsonValue["Description"] = "Manager Network Service";
++        asyncResp->res.jsonValue["Status"]["Health"] = "OK";
++        asyncResp->res.jsonValue["Status"]["HealthRollup"] = "OK";
++        asyncResp->res.jsonValue["Status"]["State"] = "Enabled";
++
++        for (auto& protocol : protocolToDBus)
++        {
++            asyncResp->res.jsonValue[protocol.first]["ProtocolEnabled"] = false;
++        }
++
++        asyncResp->res.jsonValue["HostName"] = getHostName();
++
++        crow::connections::systemBus->async_method_call(
++            [asyncResp](const boost::system::error_code ec,
++                        const std::vector<UnitStruct>& resp) {
++                if (ec)
++                {
++                    asyncResp->res.jsonValue = nlohmann::json::object();
++                    messages::internalError(asyncResp->res);
++                    return;
++                }
++
++                for (auto& unit : resp)
++                {
++                    for (auto& kv : protocolToDBus)
++                    {
++                        if (kv.second.serviceName ==
++                            std::get<NET_PROTO_UNIT_NAME>(unit))
++                        {
++                            continue;
++                        }
++                        const char* service = kv.first;
++                        const char* socketPath = kv.second.socketPath;
++
++                        asyncResp->res.jsonValue[service]["ProtocolEnabled"] =
++                            std::get<NET_PROTO_UNIT_SUB_STATE>(unit) ==
++                            "running";
++
++                        crow::connections::systemBus->async_method_call(
++                            [asyncResp, service{std::string(service)},
++                             socketPath](
++                                const boost::system::error_code ec,
++                                const std::variant<std::vector<std::tuple<
++                                    std::string, std::string>>>& resp) {
++                                if (ec)
++                                {
++                                    messages::internalError(asyncResp->res);
++                                    return;
++                                }
++                                const std::vector<
++                                    std::tuple<std::string, std::string>>*
++                                    responsePtr = std::get_if<std::vector<
++                                        std::tuple<std::string, std::string>>>(
++                                        &resp);
++                                if (responsePtr == nullptr ||
++                                    responsePtr->size() < 1)
++                                {
++                                    return;
++                                }
++
++                                const std::string& listenStream =
++                                    std::get<NET_PROTO_LISTEN_STREAM>(
++                                        (*responsePtr)[0]);
++                                std::size_t lastColonPos =
++                                    listenStream.rfind(":");
++                                if (lastColonPos == std::string::npos)
++                                {
++                                    // Not a port
++                                    return;
++                                }
++                                std::string portStr =
++                                    listenStream.substr(lastColonPos + 1);
++                                char* endPtr = nullptr;
++                                // Use strtol instead of stroi to avoid
++                                // exceptions
++                                long port =
++                                    std::strtol(portStr.c_str(), &endPtr, 10);
++
++                                if (*endPtr != '\0' || portStr.empty())
++                                {
++                                    // Invalid value
++                                    asyncResp->res.jsonValue[service]["Port"] =
++                                        nullptr;
++                                }
++                                else
++                                {
++                                    // Everything OK
++                                    asyncResp->res.jsonValue[service]["Port"] =
++                                        port;
++                                }
++                            },
++                            "org.freedesktop.systemd1", socketPath,
++                            "org.freedesktop.DBus.Properties", "Get",
++                            "org.freedesktop.systemd1.Socket", "Listen");
++                    }
++                }
++            },
++            "org.freedesktop.systemd1", "/org/freedesktop/systemd1",
++            "org.freedesktop.systemd1.Manager", "ListUnits");
++    }
++};
++
++} // namespace redfish
+diff --git a/redfish-core/lib/rmc_power.hpp b/redfish-core/lib/rmc_power.hpp
+new file mode 100644
+index 0000000..e322fc7
+--- /dev/null
++++ b/redfish-core/lib/rmc_power.hpp
+@@ -0,0 +1,153 @@
++/*
++// Copyright (c) 2018 Intel Corporation
++// Copyright (c) 2018 Ampere Computing LLC
++/
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++*/
++#pragma once
++
++#include "node.hpp"
++
++namespace redfish
++{
++
++class Power : public Node
++{
++  public:
++    Power(CrowApp& app) :
++        Node((app), "/redfish/v1/Chassis/<str>/Power/", std::string())
++    {
++        entityPrivileges = {
++            {boost::beast::http::verb::get, {{"Login"}}},
++            {boost::beast::http::verb::head, {{"Login"}}},
++            {boost::beast::http::verb::patch, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::put, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::delete_, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::post, {{"ConfigureManager"}}}};
++    }
++
++  private:
++    void getPowerControlInfo(const std::string& chassis_name,
++                             std::shared_ptr<AsyncResp> asyncResp)
++    {
++        nlohmann::json& item = asyncResp->res.jsonValue["PowerControl"][0];
++        item["@odata.id"] =
++            "/redfish/v1/Chassis/" + chassis_name + "/Power#/PowerControl/0";
++        item["MemberId"] = 0;
++        item["Name"] = "System Power Control";
++        item["PowerConsumedWatts"] = 8000;
++        item["PowerRequestedWatts"] = 8500;
++        item["PowerAvailableWatts"] = 8500;
++        item["PowerCapacityWatts"] = 10000;
++        item["PowerAllocatedWatts"] = 8500;
++        item["PowerMetrics"]["IntervalInMin"] = {};
++        item["PowerMetrics"]["MinConsumedWatts"] = {};
++        item["PowerMetrics"]["MaxConsumedWatts"] = {};
++        item["PowerMetrics"]["AverageConsumedWatts"] = {};
++        item["PowerLimit"]["LimitInWatts"] = {};
++        item["PowerLimit"]["LimitException"] = {};
++        item["PowerLimit"]["CorrectionInMs"] = {};
++        item["RelatedItem"][0] = {{"@odata.id", "/redfish/v1/Chassis/node1"}};
++        item["Status"]["State"] = "Enabled";
++        item["Status"]["Health"] = "OK";
++        item["Status"]["HealthRollup"] = "OK";
++    }
++    void getVoltagesInfo(const std::string& chassis_name,
++                         std::shared_ptr<AsyncResp> asyncResp, int id,
++                         const std::string& sensor_name, int sensor_number,
++                         int value)
++    {
++        nlohmann::json& item = asyncResp->res.jsonValue["Voltages"][id];
++        item["@odata.id"] = "/redfish/v1/Chassis/" + chassis_name +
++                            "/Power#/Voltages/" + std::to_string(id);
++        item["MemberId"] = id;
++        item["Name"] = sensor_name;
++        item["SensorNumber"] = sensor_number;
++        item["Status"]["State"] = "Enabled";
++        item["Status"]["Health"] = "OK";
++        item["ReadingVolts"] = value;
++        item["UpperThresholdNonCritical"] = {};
++        item["UpperThresholdCritical"] = {};
++        item["UpperThresholdFatal"] = {};
++        item["LowerThresholdNonCritical"] = {};
++        item["LowerThresholdCritical"] = {};
++        item["LowerThresholdFatal"] = {};
++        item["MinReadingRange"] = {};
++        item["MaxReadingRange"] = {};
++        item["PhysicalContext"] = "VoltageRegulator";
++        item["RelatedItem"][0] = {{"@odata.id", "/redfish/v1/Chassis/node1"}};
++    }
++
++    void getPowerSuppliesInfo(const std::string& chassis_name,
++                              std::shared_ptr<AsyncResp> asyncResp)
++    {
++        nlohmann::json& item = asyncResp->res.jsonValue["PowerSupplies"][0];
++        item["@odata.id"] =
++            "/redfish/v1/Chassis/" + chassis_name + "/Power#/PowerSupplies/0";
++        item["MemberId"] = 0;
++        item["Name"] = "Power Supply";
++        item["Status"]["State"] = "Enabled";
++        item["Status"]["Health"] = "OK";
++        item["PowerSupplyType"] = "DC";
++        item["LineInputVoltageType"] = "DCNeg48V";
++        item["LineInputVoltage"] = 48;
++        item["PowerCapacityWatts"] = 400;
++        item["LastPowerOutputWatts"] = 192;
++        item["Model"] = "499253-B21";
++        item["Manufacturer"] = "Delta";
++        item["FirmwareVersion"] = "2.75";
++        item["SerialNumber"] = "1Z00103";
++        item["PartNumber"] = "1Z00103a2";
++        item["SparePartNumber"] = {};
++        item["InputRanges"] = nlohmann::json::array();
++        item["IndicatorLED"] = "Off";
++
++        item["RelatedItem"][0] = {{"@odata.id", "/redfish/v1/Chassis/node1"}};
++    }
++
++    void getPowerInfo(const std::string& chassis_name,
++                      std::shared_ptr<AsyncResp> asyncResp)
++    {
++        getPowerControlInfo(chassis_name, asyncResp);
++        getPowerSuppliesInfo(chassis_name, asyncResp);
++        getVoltagesInfo(chassis_name, asyncResp, 0, "VRM1", 11, 12);
++        getVoltagesInfo(chassis_name, asyncResp, 1, "P5V", 12, 5);
++        getVoltagesInfo(chassis_name, asyncResp, 2, "P3.3V", 13, 3.3);
++        getVoltagesInfo(chassis_name, asyncResp, 3, "P1.5V", 14, 1.5);
++        getVoltagesInfo(chassis_name, asyncResp, 4, "P3.3V_STBY", 15, 3.3);
++    }
++
++    void doGet(crow::Response& res, const crow::Request& req,
++               const std::vector<std::string>& params) override
++    {
++        if (params.size() != 1)
++        {
++            res.result(boost::beast::http::status::internal_server_error);
++            res.end();
++            return;
++        }
++        const std::string& chassis_name = params[0];
++
++        res.jsonValue["@odata.id"] =
++            "/redfish/v1/Chassis/" + chassis_name + "/Power";
++        res.jsonValue["@odata.type"] = "#Power.v1_2_1.Power";
++        res.jsonValue["@odata.context"] = "/redfish/v1/$metadata#Power.Power";
++        res.jsonValue["Id"] = "Power";
++        res.jsonValue["Name"] = "Power";
++        auto asyncResp = std::make_shared<AsyncResp>(res);
++
++        getPowerInfo(chassis_name, asyncResp);
++    }
++};
++
++} // namespace redfish
+diff --git a/redfish-core/lib/rmc_systems.hpp b/redfish-core/lib/rmc_systems.hpp
+new file mode 100644
+index 0000000..b01666a
+--- /dev/null
++++ b/redfish-core/lib/rmc_systems.hpp
+@@ -0,0 +1,406 @@
++/*
++// Copyright (c) 2018 Intel Corporation
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++*/
++#pragma once
++
++#include <boost/container/flat_map.hpp>
++#include <node.hpp>
++#include <utils/json_utils.hpp>
++
++namespace redfish
++{
++
++/**
++ * SystemsCollection derived class for delivering ComputerSystems Collection
++ * Schema
++ */
++class SystemsCollection : public Node
++{
++  public:
++    SystemsCollection(CrowApp &app) : Node(app, "/redfish/v1/Systems/")
++    {
++        entityPrivileges = {
++            {boost::beast::http::verb::get, {{"Login"}}},
++            {boost::beast::http::verb::head, {{"Login"}}},
++            {boost::beast::http::verb::patch, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::put, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::delete_, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::post, {{"ConfigureComponents"}}}};
++    }
++
++  private:
++    void doGet(crow::Response &res, const crow::Request &req,
++               const std::vector<std::string> &params) override
++    {
++        BMCWEB_LOG_DEBUG << "Get list of available boards.";
++        std::shared_ptr<AsyncResp> asyncResp = std::make_shared<AsyncResp>(res);
++        res.jsonValue["@odata.type"] =
++            "#ComputerSystemCollection.ComputerSystemCollection";
++        res.jsonValue["@odata.id"] = "/redfish/v1/Systems";
++        res.jsonValue["@odata.context"] =
++            "/redfish/v1/"
++            "$metadata#ComputerSystemCollection.ComputerSystemCollection";
++        res.jsonValue["Name"] = "Computer System Collection";
++
++        nlohmann::json &systemArrary = res.jsonValue["Members"];
++        systemArrary.push_back({{"@odata.id", "/redfish/v1/Systems/system1"}});
++        systemArrary.push_back({{"@odata.id", "/redfish/v1/Systems/system2"}});
++        systemArrary.push_back({{"@odata.id", "/redfish/v1/Systems/system3"}});
++        res.jsonValue["Memebers@odata.count"] = systemArrary.size();
++        res.end();
++    }
++};
++
++/**
++ * SystemActionsReset class supports handle POST method for Reset action.
++ * The class retrieves and sends data directly to D-Bus.
++ */
++class SystemActionsReset : public Node
++{
++  public:
++    SystemActionsReset(CrowApp &app) :
++        Node(app, "/redfish/v1/Systems/<str>/Actions/ComputerSystem.Reset/",
++             std::string())
++    {
++        entityPrivileges = {
++            {boost::beast::http::verb::post, {{"ConfigureComponents"}}}};
++    }
++
++  private:
++    /**
++     * Function handles POST method request.
++     * Analyzes POST body message before sends Reset request data to D-Bus.
++     */
++    void doPost(crow::Response &res, const crow::Request &req,
++                const std::vector<std::string> &params) override
++    {
++    }
++};
++
++/**
++ * Systems derived class for delivering Computer Systems Schema.
++ */
++class Systems : public Node
++{
++  public:
++    /*
++     * Default Constructor
++     */
++    Systems(CrowApp &app) :
++        Node(app, "/redfish/v1/Systems/<str>/", std::string())
++    {
++        entityPrivileges = {
++            {boost::beast::http::verb::get, {{"Login"}}},
++            {boost::beast::http::verb::head, {{"Login"}}},
++            {boost::beast::http::verb::patch, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::put, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::delete_, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::post, {{"ConfigureComponents"}}}};
++    }
++
++  private:
++    /**
++     * Functions triggers appropriate requests on DBus
++     */
++    void doGet(crow::Response &res, const crow::Request &req,
++               const std::vector<std::string> &params) override
++    {
++        // Check if there is required param, truly entering this shall be
++        // impossible
++        if (params.size() != 1)
++        {
++            messages::internalError(res);
++            res.end();
++            return;
++        }
++
++        const std::string &name = params[0];
++
++        res.jsonValue["@odata.type"] = "#ComputerSystem.v1_5_1.ComputerSystem";
++        res.jsonValue["@odata.context"] =
++            "/redfish/v1/$metadata#ComputerSystem.ComputerSystem";
++        res.jsonValue["SystemType"] = "Physical";
++        res.jsonValue["Description"] = "Computer System";
++        res.jsonValue["Boot"]["BootSourceOverrideEnabled"] =
++            "Disabled"; // TODO(Dawid), get real boot data
++        res.jsonValue["Boot"]["BootSourceOverrideTarget"] =
++            "None"; // TODO(Dawid), get real boot data
++        res.jsonValue["Boot"]["BootSourceOverrideMode"] =
++            "Legacy"; // TODO(Dawid), get real boot data
++        res.jsonValue["Boot"]
++                     ["BootSourceOverrideTarget@Redfish.AllowableValues"] = {
++            "None",      "Pxe",       "Hdd", "Cd",
++            "BiosSetup", "UefiShell", "Usb"}; // TODO(Dawid), get real boot
++                                              // data
++        res.jsonValue["ProcessorSummary"]["Count"] = 2;
++        res.jsonValue["ProcessorSummary"]["Status"]["State"] = "Enabled";
++        res.jsonValue["MemorySummary"]["TotalSystemMemoryGiB"] = 96;
++        res.jsonValue["MemorySummary"]["Status"]["State"] = "Enabled";
++        res.jsonValue["@odata.id"] = "/redfish/v1/Systems/" + name;
++
++        res.jsonValue["Processors"] = {
++            {"@odata.id", "/redfish/v1/Systems/" + name + "/Processors"}};
++        res.jsonValue["Memory"] = {
++            {"@odata.id", "/redfish/v1/Systems/" + name + "/Memory"}};
++        // TODO Need to support ForceRestart.
++        res.jsonValue["Actions"]["#ComputerSystem.Reset"] = {
++            {"target",
++             "/redfish/v1/Systems/" + name + "/Actions/ComputerSystem.Reset"},
++            {"ResetType@Redfish.AllowableValues",
++             {"On", "ForceOff", "GracefulRestart", "GracefulShutdown"}}};
++
++        res.jsonValue["LogServices"] = {
++            {"@odata.id", "/redfish/v1/Systems/" + name + "/LogServices"}};
++
++        res.end();
++    }
++
++    void doPatch(crow::Response &res, const crow::Request &req,
++                 const std::vector<std::string> &params) override
++    {
++    }
++};
++
++class ProcessorCollection : public Node
++{
++  public:
++    ProcessorCollection(CrowApp &app) :
++        Node(app, "/redfish/v1/Systems/<str>/Processors", std::string())
++    {
++        entityPrivileges = {
++            {boost::beast::http::verb::get, {{"Login"}}},
++            {boost::beast::http::verb::head, {{"Login"}}},
++            {boost::beast::http::verb::patch, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::put, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::delete_, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::post, {{"ConfigureComponents"}}}};
++    }
++
++  private:
++    void getProcessorList(const std::string &chassis_name,
++                          std::shared_ptr<AsyncResp> asyncResp)
++    {
++        nlohmann::json &chassisArray = asyncResp->res.jsonValue["Members"];
++        chassisArray = nlohmann::json::array();
++        chassisArray.push_back(
++            {{"@odata.id",
++              "/redfish/v1/Systems/" + chassis_name + "/Processors/cpu0"}});
++        chassisArray.push_back(
++            {{"@odata.id",
++              "/redfish/v1/Systems/" + chassis_name + "/Processors/cpu1"}});
++        asyncResp->res.jsonValue["Members@odata.count"] = chassisArray.size();
++    }
++
++    void doGet(crow::Response &res, const crow::Request &req,
++               const std::vector<std::string> &params) override
++    {
++        if (params.size() != 1)
++        {
++            messages::internalError(res);
++            res.end();
++            return;
++        }
++        const std::string &chassisId = params[0];
++
++        res.jsonValue["@odata.type"] =
++            "#ProcessorCollection.ProcessorCollection";
++        res.jsonValue["@odata.id"] =
++            "/redfish/v1/Systems/" + chassisId + "/Processors";
++        res.jsonValue["@odata.context"] =
++            "/redfish/v1/$metadata#ProcessorCollection.ProcessorCollection";
++        res.jsonValue["Name"] = "Processors Collection";
++        auto asyncResp = std::make_shared<AsyncResp>(res);
++        getProcessorList(chassisId, asyncResp);
++    }
++};
++
++class MemoryCollection : public Node
++{
++  public:
++    MemoryCollection(CrowApp &app) :
++        Node(app, "/redfish/v1/Systems/<str>/Memory", std::string())
++    {
++        entityPrivileges = {
++            {boost::beast::http::verb::get, {{"Login"}}},
++            {boost::beast::http::verb::head, {{"Login"}}},
++            {boost::beast::http::verb::patch, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::put, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::delete_, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::post, {{"ConfigureComponents"}}}};
++    }
++
++  private:
++    void getMemoryList(const std::string &chassis_name,
++                       std::shared_ptr<AsyncResp> asyncResp)
++    {
++        nlohmann::json &chassisArray = asyncResp->res.jsonValue["Members"];
++        chassisArray = nlohmann::json::array();
++        chassisArray.push_back(
++            {{"@odata.id",
++              "/redfish/v1/Systems/" + chassis_name + "/Memory/mem0"}});
++        chassisArray.push_back(
++            {{"@odata.id",
++              "/redfish/v1/Systems/" + chassis_name + "/Memory/mem1"}});
++        chassisArray.push_back(
++            {{"@odata.id",
++              "/redfish/v1/Systems/" + chassis_name + "/Memory/mem2"}});
++        chassisArray.push_back(
++            {{"@odata.id",
++              "/redfish/v1/Systems/" + chassis_name + "/Memory/mem3"}});
++        asyncResp->res.jsonValue["Members@odata.count"] = chassisArray.size();
++    }
++
++    void doGet(crow::Response &res, const crow::Request &req,
++               const std::vector<std::string> &params) override
++    {
++        if (params.size() != 1)
++        {
++            messages::internalError(res);
++            res.end();
++            return;
++        }
++        const std::string &chassisId = params[0];
++
++        res.jsonValue["@odata.type"] = "#MemoryCollection.MemoryCollection";
++        res.jsonValue["@odata.id"] =
++            "/redfish/v1/Systems/" + chassisId + "/Memory";
++        res.jsonValue["@odata.context"] =
++            "/redfish/v1/$metadata#MemoryCollection.MemoryCollection";
++        res.jsonValue["Name"] = "Memory Collection";
++        auto asyncResp = std::make_shared<AsyncResp>(res);
++        getMemoryList(chassisId, asyncResp);
++    }
++};
++
++class Processor : public Node
++{
++  public:
++    /*
++     * Default Constructor
++     */
++    Processor(CrowApp &app) :
++        Node(app, "/redfish/v1/Systems/<str>/Processors/<str>", std::string(),
++             std::string())
++    {
++        entityPrivileges = {
++            {boost::beast::http::verb::get, {{"Login"}}},
++            {boost::beast::http::verb::head, {{"Login"}}},
++            {boost::beast::http::verb::patch, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::put, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::delete_, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::post, {{"ConfigureComponents"}}}};
++    }
++
++  private:
++    /**
++     * Functions triggers appropriate requests on DBus
++     */
++    void doGet(crow::Response &res, const crow::Request &req,
++               const std::vector<std::string> &params) override
++    {
++        // Check if there is required param, truly entering this shall be
++        // impossible
++        if (params.size() != 2)
++        {
++            messages::internalError(res);
++            res.end();
++            return;
++        }
++        const std::string &systemId = params[0];
++        const std::string &processorId = params[1];
++
++        res.jsonValue["@odata.id"] =
++            "/redfish/v1/Systems/" + systemId + "/Processors/" + processorId;
++        res.jsonValue["@odata.type"] = "#Processor.v1_3_2.Processor";
++        res.jsonValue["@odata.context"] =
++            "/redfish/v1/$metadata#Processor.Processor";
++        res.jsonValue["Manufacturer"] = "Intel";
++        res.jsonValue["Model"] = "Intel(R) Xeon(R) Platinum 8176 CPU @ 2.10GHz";
++        res.jsonValue["MaxSpeedMHz"] = 2100;
++        res.jsonValue["TDPWatts"] = 165;
++        res.jsonValue["TotalCores"] = 28;
++
++        nlohmann::json &status = res.jsonValue["Status"];
++        status["State"] = "Enabled";
++        status["Health"] = "OK";
++        status["HealthRollup"] = {};
++        res.end();
++    }
++};
++class Memory : public Node
++{
++  public:
++    /*
++     * Default Constructor
++     */
++    Memory(CrowApp &app) :
++        Node(app, "/redfish/v1/Systems/<str>/Memory/<str>", std::string(),
++             std::string())
++    {
++        entityPrivileges = {
++            {boost::beast::http::verb::get, {{"Login"}}},
++            {boost::beast::http::verb::head, {{"Login"}}},
++            {boost::beast::http::verb::patch, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::put, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::delete_, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::post, {{"ConfigureComponents"}}}};
++    }
++
++  private:
++    /**
++     * Functions triggers appropriate requests on DBus
++     */
++    void doGet(crow::Response &res, const crow::Request &req,
++               const std::vector<std::string> &params) override
++    {
++        // Check if there is required param, truly entering this shall be
++        // impossible
++        if (params.size() != 2)
++        {
++            messages::internalError(res);
++            res.end();
++            return;
++        }
++        // Check if there is required param, truly entering this shall be
++
++        const std::string &systemId = params[0];
++        const std::string &memId = params[1];
++
++        res.jsonValue["@odata.id"] =
++            "/redfish/v1/Systems/" + systemId + "/Memory/" + memId;
++        res.jsonValue["@odata.type"] = "#Memory.v1_0_0.Memory";
++        res.jsonValue["@odata.context"] = "/redfish/v1/$metadata#Memory.Memory";
++        res.jsonValue["CapacityMiB"] = 16 * 1024;
++        res.jsonValue["Meanufacturer"] = "Samsung";
++        if (memId == "mem0")
++            res.jsonValue["SerialNumber"] = "390FB680";
++        else if (memId == "mem1")
++            res.jsonValue["SerialNumber"] = "393BE2A3";
++        else if (memId == "mem2")
++            res.jsonValue["SerialNumber"] = "390FCBBD";
++        else if (memId == "mem3")
++            res.jsonValue["SerialNumber"] = "39359D7F";
++        else
++            res.jsonValue["SerialNumber"] = "39359D93";
++        nlohmann::json &status = res.jsonValue["Status"];
++        status["State"] = "Enabled";
++        status["Health"] = "OK";
++        status["HealthRollup"] = {};
++
++        res.jsonValue["AllowedSpeedsMHz"] = 2133;
++        res.end();
++    }
++};
++} // namespace redfish
+diff --git a/redfish-core/lib/rmc_thermal.hpp b/redfish-core/lib/rmc_thermal.hpp
+new file mode 100644
+index 0000000..9564bc8
+--- /dev/null
++++ b/redfish-core/lib/rmc_thermal.hpp
+@@ -0,0 +1,125 @@
++/*
++// Copyright (c) 2018 Intel Corporation
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++*/
++#pragma once
++
++#include "node.hpp"
++
++namespace redfish
++{
++class Thermal : public Node
++{
++  public:
++    Thermal(CrowApp& app) :
++        Node((app), "/redfish/v1/Chassis/<str>/Thermal/", std::string())
++    {
++        entityPrivileges = {
++            {boost::beast::http::verb::get, {{"Login"}}},
++            {boost::beast::http::verb::head, {{"Login"}}},
++            {boost::beast::http::verb::patch, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::put, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::delete_, {{"ConfigureManager"}}},
++            {boost::beast::http::verb::post, {{"ConfigureManager"}}}};
++    }
++
++  private:
++    void getTemperatures(const std::string& chassis_name,
++                         std::shared_ptr<AsyncResp> asyncResp, int id,
++                         const std::string sensor_name, int sensor_number,
++                         int value)
++    {
++        nlohmann::json& item = asyncResp->res.jsonValue["Temperatures"][id];
++        item["@odata.id"] = "/redfish/v1/Chassis/" + chassis_name +
++                            "/Thermal#/Temperatures/" + std::to_string(id);
++        item["MemberId"] = id;
++        item["Name"] = sensor_name;
++        item["SensorNumber"] = sensor_number;
++        item["Status"]["State"] = "Enabled";
++        item["Status"]["Health"] = "OK";
++        item["ReadingCelsius"] = value;
++        item["UpperThresholdNonCritical"] = {};
++        item["UpperThresholdCritical"] = {};
++        item["UpperThresholdFatal"] = {};
++        item["LowerThresholdNonCritical"] = {};
++        item["LowerThresholdCritical"] = {};
++        item["LowerThresholdFatal"] = {};
++        item["MinReadingRange"] = {};
++        item["MaxReadingRange"] = {};
++        item["PhysicalContext"] = "Intake";
++        item["RelatedItem"][0] = {{"@odata.id", "/redfish/v1/Chassis/node1"}};
++    }
++
++    void getFans(const std::string& chassis_name,
++                 std::shared_ptr<AsyncResp> asyncResp, int id,
++                 const std::string sensor_name, int sensor_number, int value)
++    {
++        nlohmann::json& item = asyncResp->res.jsonValue["Fans"][id];
++        item["@odata.id"] = "/redfish/v1/Chassis/" + chassis_name +
++                            "/Thermal#/Fans/" + std::to_string(id);
++        item["MemberId"] = id;
++        item["Name"] = sensor_name;
++        item["SensorNumber"] = sensor_number;
++        item["Status"]["State"] = "Enabled";
++        item["Status"]["Health"] = "OK";
++        item["Reading"] = value;
++        item["ReadingUnits"] = "RPM";
++        item["UpperThresholdNonCritical"] = {};
++        item["UpperThresholdCritical"] = {};
++        item["UpperThresholdFatal"] = {};
++        item["LowerThresholdNonCritical"] = {};
++        item["LowerThresholdCritical"] = {};
++        item["LowerThresholdFatal"] = {};
++        item["MinReadingRange"] = {};
++        item["MaxReadingRange"] = {};
++        item["RelatedItem"][0] = {{"@odata.id", "/redfish/v1/Chassis/node1"}};
++    }
++
++    void getThermalInfo(const std::string& chassisName,
++                        std::shared_ptr<AsyncResp> asyncResp)
++    {
++        getFans(chassisName, asyncResp, 0, "BaseBoard System Fan 0", 1, 3505);
++        getFans(chassisName, asyncResp, 1, "BaseBoard System Fan 1", 2, 3682);
++        getFans(chassisName, asyncResp, 2, "BaseBoard System Fan 2", 3, 3728);
++        getFans(chassisName, asyncResp, 3, "BaseBoard System Fan 3", 4, 3342);
++        getTemperatures(chassisName, asyncResp, 0, "Inlet Temp 0", 5, 27);
++        getTemperatures(chassisName, asyncResp, 1, "Inlet Temp 1", 6, 26);
++        getTemperatures(chassisName, asyncResp, 2, "Outlet Temp 2", 7, 32);
++        getTemperatures(chassisName, asyncResp, 3, "Outlet Temp 3", 8, 31);
++    }
++    void doGet(crow::Response& res, const crow::Request& req,
++               const std::vector<std::string>& params) override
++    {
++        if (params.size() != 1)
++        {
++            messages::internalError(res);
++            res.end();
++            return;
++        }
++        const std::string& chassisName = params[0];
++        res.jsonValue["@odata.type"] = "#Thermal.v1_4_0.Thermal";
++        res.jsonValue["@odata.context"] =
++            "/redfish/v1/$metadata#Thermal.Thermal";
++        res.jsonValue["Id"] = "Thermal";
++        res.jsonValue["Name"] = "Thermal";
++
++        res.jsonValue["@odata.id"] =
++            "/redfish/v1/Chassis/" + chassisName + "/Thermal";
++
++        auto asyncResp = std::make_shared<AsyncResp>(res);
++        getThermalInfo(chassisName, asyncResp);
++    }
++};
++
++} // namespace redfish
+diff --git a/redfish-core/lib/rmc_update_service.hpp b/redfish-core/lib/rmc_update_service.hpp
+new file mode 100644
+index 0000000..dbecddc
+--- /dev/null
++++ b/redfish-core/lib/rmc_update_service.hpp
+@@ -0,0 +1,147 @@
++/*
++// Copyright (c) 2018 Intel Corporation
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//      http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++*/
++#pragma once
++
++#include "node.hpp"
++
++#include <boost/container/flat_map.hpp>
++
++namespace redfish
++{
++
++class UpdateService : public Node
++{
++  public:
++    UpdateService(CrowApp &app) : Node(app, "/redfish/v1/UpdateService/")
++    {
++        entityPrivileges = {
++            {boost::beast::http::verb::get, {{"Login"}}},
++            {boost::beast::http::verb::head, {{"Login"}}},
++            {boost::beast::http::verb::patch, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::put, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::delete_, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::post, {{"ConfigureComponents"}}}};
++    }
++
++  private:
++    void doGet(crow::Response &res, const crow::Request &req,
++               const std::vector<std::string> &params) override
++    {
++        res.jsonValue["@odata.type"] = "#UpdateService.v1_2_0.UpdateService";
++        res.jsonValue["@odata.id"] = "/redfish/v1/UpdateService";
++        res.jsonValue["@odata.context"] =
++            "/redfish/v1/$metadata#UpdateService/$entity";
++        res.jsonValue["Id"] = "UpdateService";
++        res.jsonValue["Description"] = "Service for Software Update";
++        res.jsonValue["Name"] = "Update Service";
++        res.jsonValue["Status"]["Health"] = "OK";
++        res.jsonValue["Status"]["HealthRollup"] = "OK";
++        res.jsonValue["Status"]["State"] = "Enabled";
++        // UpdateService cannot be disabled
++        res.jsonValue["ServiceEnabled"] = true;
++
++        nlohmann::json &actions = res.jsonValue["Actions"];
++        actions["#UpdateService.SimpleUpdate"]["target"] =
++            "/redfish/v1/UpdateService/Actions/SimpleUpdate";
++        actions["@Redfish.ActionInfo"] =
++            "/redfish/v1/UpdateService/SimpleUpdateActionIfo";
++        res.end();
++    }
++};
++
++class SoftwareInventoryCollection : public Node
++{
++  public:
++    template <typename CrowApp>
++    SoftwareInventoryCollection(CrowApp &app) :
++        Node(app, "/redfish/v1/UpdateService/FirmwareInventory/")
++    {
++        entityPrivileges = {
++            {boost::beast::http::verb::get, {{"Login"}}},
++            {boost::beast::http::verb::head, {{"Login"}}},
++            {boost::beast::http::verb::patch, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::put, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::delete_, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::post, {{"ConfigureComponents"}}}};
++    }
++
++  private:
++    void doGet(crow::Response &res, const crow::Request &req,
++               const std::vector<std::string> &params) override
++    {
++        std::shared_ptr<AsyncResp> asyncResp = std::make_shared<AsyncResp>(res);
++        res.jsonValue["@odata.type"] =
++            "#SoftwareInventoryCollection.SoftwareInventoryCollection";
++        res.jsonValue["@odata.id"] =
++            "/redfish/v1/UpdateService/FirmwareInventory";
++        res.jsonValue["@odata.context"] =
++            "/redfish/v1/"
++            "$metadata#SoftwareInventoryCollection.SoftwareInventoryCollection";
++        res.jsonValue["Name"] = "Software Inventory Collection";
++        res.end();
++    }
++};
++
++class SoftwareInventory : public Node
++{
++  public:
++    template <typename CrowApp>
++    SoftwareInventory(CrowApp &app) :
++        Node(app, "/redfish/v1/UpdateService/FirmwareInventory/<str>/",
++             std::string())
++    {
++        entityPrivileges = {
++            {boost::beast::http::verb::get, {{"Login"}}},
++            {boost::beast::http::verb::head, {{"Login"}}},
++            {boost::beast::http::verb::patch, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::put, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::delete_, {{"ConfigureComponents"}}},
++            {boost::beast::http::verb::post, {{"ConfigureComponents"}}}};
++    }
++
++  private:
++    void doGet(crow::Response &res, const crow::Request &req,
++               const std::vector<std::string> &params) override
++    {
++        std::shared_ptr<AsyncResp> asyncResp = std::make_shared<AsyncResp>(res);
++        res.jsonValue["@odata.type"] =
++            "#SoftwareInventory.v1_1_0.SoftwareInventory";
++        res.jsonValue["@odata.context"] =
++            "/redfish/v1/$metadata#SoftwareInventory.SoftwareInventory";
++        res.jsonValue["Name"] = "Software Inventory";
++        res.jsonValue["Updateable"] = false;
++        res.jsonValue["Status"]["Health"] = "OK";
++        res.jsonValue["Status"]["HealthRollup"] = "OK";
++        res.jsonValue["Status"]["State"] = "Enabled";
++
++        if (params.size() != 1)
++        {
++            messages::internalError(res);
++            res.end();
++            return;
++        }
++
++        std::shared_ptr<std::string> swId =
++            std::make_shared<std::string>(params[0]);
++
++        res.jsonValue["@odata.id"] =
++            "/redfish/v1/UpdateService/FirmwareInventory/" + *swId;
++
++        res.end();
++    }
++};
++
++} // namespace redfish
+-- 
+2.17.1
+
