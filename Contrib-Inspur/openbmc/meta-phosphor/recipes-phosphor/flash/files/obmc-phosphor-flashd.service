@@ -1,0 +1,10 @@
+[Unit]
+Description=Phosphor Flash Controller
+
+[Service]
+Restart=always
+ExecStart=/usr/bin/env obmc-phosphor-flashd
+SyslogIdentifier=obmc-phosphor-flashd
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,42 @@
+Subject: [PATCH] Support separation of SRCDIR and OBJDIR
+
+Typical use of VPATH to locate the sources.
+
+Upstream-Status: Pending
+
+Signed-off-by: Christopher Larson <chris_larson@mentor.com>
+Signed-off-by: Maxin B. John <maxin.john@intel.com>
+---
+ Makefile | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index 33aaf6a..9030796 100644
+--- a/Makefile
++++ b/Makefile
+@@ -1,5 +1,9 @@
+ MAKEFLAGS += --no-print-directory
+
++SRCDIR ?= $(dir $(lastword $(MAKEFILE_LIST)))
++OBJDIR ?= $(PWD)
++VPATH = $(SRCDIR)
++
+ PREFIX ?= /usr
+ SBINDIR ?= $(PREFIX)/sbin
+ MANDIR ?= $(PREFIX)/share/man
+@@ -103,11 +107,11 @@ VERSION_OBJS := $(filter-out version.o, $(OBJS))
+ version.c: version.sh $(patsubst %.o,%.c,$(VERSION_OBJS)) nl80211.h iw.h Makefile \
+ 		$(wildcard .git/index .git/refs/tags)
+ 	@$(NQ) ' GEN ' $@
+-	$(Q)./version.sh $@
++	$(Q)cd $(SRCDIR) && ./version.sh $(OBJDIR)/$@
+
+ %.o: %.c iw.h nl80211.h
+ 	@$(NQ) ' CC  ' $@
+-	$(Q)$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<
++	$(Q)$(CC) -I$(SRCDIR) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<
+
+ ifeq ($(IW_ANDROID_BUILD),)
+ iw:	$(OBJS)
+--
+2.20.1 (Apple Git-117)

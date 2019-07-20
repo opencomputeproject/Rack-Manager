@@ -1,0 +1,55 @@
+cmake_minimum_required (VERSION 3.5)
+
+include (ExternalProject)
+
+file (MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/prefix)
+file (MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/prefix/include)
+
+# requires apt install autoconf-archive and autoconf
+externalproject_add (
+    sdbusplus-project PREFIX ${CMAKE_BINARY_DIR}/sdbusplus-project
+    GIT_REPOSITORY https://github.com/openbmc/sdbusplus.git GIT_TAG
+    bed15f0cee4784acdf151cca14efdfb98cb9d397 SOURCE_DIR
+    ${CMAKE_BINARY_DIR}/sdbusplus-src BINARY_DIR
+    ${CMAKE_BINARY_DIR}/sdbusplus-build CONFIGURE_COMMAND "" BUILD_COMMAND cd
+    ${CMAKE_BINARY_DIR}/sdbusplus-src && ./bootstrap.sh && ./configure
+    --enable-transaction && make -j libsdbusplus.la INSTALL_COMMAND ""
+    LOG_DOWNLOAD ON
+)
+
+externalproject_add (
+    tinyxml2 GIT_REPOSITORY https://github.com/leethomason/tinyxml2.git GIT_TAG
+    8c8293ba8969a46947606a93ff0cb5a083aab47a CMAKE_ARGS SOURCE_DIR
+    "${CMAKE_BINARY_DIR}/tinyxml2-src" BINARY_DIR
+    "${CMAKE_BINARY_DIR}/tinyxml2-build" CMAKE_ARGS
+    -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/prefix
+)
+
+externalproject_add (
+    gtest GIT_REPOSITORY "https://github.com/google/googletest.git" GIT_TAG
+    dfa853b63d17c787914b663b50c2095a0c5b706e CMAKE_ARGS
+    -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/googletest-build SOURCE_DIR
+    "${CMAKE_BINARY_DIR}/googletest-src" BINARY_DIR
+    "${CMAKE_BINARY_DIR}/googletest-build" CMAKE_ARGS
+    -DCMAKE_INSTALL_PREFIX=${CMAKE_BINARY_DIR}/prefix
+)
+
+externalproject_add (
+    Boost URL
+    https://dl.bintray.com/boostorg/release/1.68.0/source/boost_1_68_0.tar.gz
+    URL_MD5 5d8b4503582fffa9eefdb9045359c239 SOURCE_DIR
+    "${CMAKE_BINARY_DIR}/boost-src" BINARY_DIR "${CMAKE_BINARY_DIR}/boost-build"
+    CONFIGURE_COMMAND "" BUILD_COMMAND "" INSTALL_COMMAND mkdir -p
+    "${CMAKE_BINARY_DIR}/prefix/include/" && cp -R
+    ${CMAKE_BINARY_DIR}/boost-src/boost ${CMAKE_BINARY_DIR}/prefix/include
+)
+
+externalproject_add (
+    nlohmann-json GIT_REPOSITORY "https://github.com/nlohmann/json.git" GIT_TAG
+    aafad2be1f3cd259a1e79d2f6fcf267d1ede9ec7 SOURCE_DIR
+    "${CMAKE_BINARY_DIR}/nlohmann-json-src" BINARY_DIR
+    "${CMAKE_BINARY_DIR}/nlohmann-json-build" CONFIGURE_COMMAND "" BUILD_COMMAND
+    "" INSTALL_COMMAND mkdir -p "${CMAKE_BINARY_DIR}/prefix/include/nlohmann" &&
+    cp -r "${CMAKE_BINARY_DIR}/nlohmann-json-src/include/nlohmann"
+    "${CMAKE_BINARY_DIR}/prefix/include"
+)

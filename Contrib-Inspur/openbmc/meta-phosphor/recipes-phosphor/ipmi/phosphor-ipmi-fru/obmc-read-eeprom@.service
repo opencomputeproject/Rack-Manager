@@ -1,0 +1,14 @@
+[Unit]
+Description=Read %I EEPROM
+Wants=mapper-wait@-xyz-openbmc_project-inventory.service
+After=mapper-wait@-xyz-openbmc_project-inventory.service
+
+[Service]
+Restart=no
+Type=oneshot
+EnvironmentFile={envfiledir}/obmc/eeproms/%I
+ExecStart=/usr/bin/env phosphor-read-eeprom --eeprom $SYSFS_PATH --fruid $FRUID
+SyslogIdentifier=phosphor-read-eeprom
+
+[Install]
+WantedBy=multi-user.target
