@@ -1,0 +1,10 @@
+[Unit]
+Description=Phosphor Dump core monitor.
+
+[Service]
+ExecStart=/usr/bin/env phosphor-dump-monitor
+SyslogIdentifier=phosphor-dump-monitor
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

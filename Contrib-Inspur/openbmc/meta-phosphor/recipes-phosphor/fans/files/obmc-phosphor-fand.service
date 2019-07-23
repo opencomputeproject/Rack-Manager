@@ -1,0 +1,10 @@
+[Unit]
+Description=Phosphor Fan Controller
+
+[Service]
+Restart=always
+ExecStart=/usr/bin/env obmc-phosphor-fand
+SyslogIdentifier=obmc-phosphor-fand
+
+[Install]
+WantedBy=multi-user.target
