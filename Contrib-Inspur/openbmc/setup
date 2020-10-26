@@ -15,10 +15,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-
-if [ "$(basename -- "$0")" = "setup" ]; then
+if [ -z "$ZSH_NAME" ] && [ "$(basename -- "$0")" = "setup" ]; then
 	echo The script must be sourced, not executed
 	exit 1
+fi
+
+# Check if 'column' command is present
+COLUMN=`which column`
+if [ -z "$COLUMN" ]; then
+    # If it is not, use 'cat'
+	COLUMN=`which cat`
 fi
 
 machine() {
@@ -54,7 +60,7 @@ machine() {
 if [ -z "$1" ]; then
 	echo Target machine must be specified. Use one of:
 	echo
-	(echo qemuarm; machine) | sort
+	(echo qemuarm; machine) | sort | $COLUMN
 elif [ "$1" = "qemuarm" ]; then
 	source openbmc-env
 else

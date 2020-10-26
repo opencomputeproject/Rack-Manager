@@ -9,7 +9,7 @@ file (MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/prefix/include)
 externalproject_add (
     sdbusplus-project PREFIX ${CMAKE_BINARY_DIR}/sdbusplus-project
     GIT_REPOSITORY https://github.com/openbmc/sdbusplus.git GIT_TAG
-    bed15f0cee4784acdf151cca14efdfb98cb9d397 SOURCE_DIR
+    4212292bcf136d04b38ba5116aa568b0fa312798 SOURCE_DIR
     ${CMAKE_BINARY_DIR}/sdbusplus-src BINARY_DIR
     ${CMAKE_BINARY_DIR}/sdbusplus-build CONFIGURE_COMMAND "" BUILD_COMMAND cd
     ${CMAKE_BINARY_DIR}/sdbusplus-src && ./bootstrap.sh && ./configure
@@ -36,8 +36,8 @@ externalproject_add (
 
 externalproject_add (
     Boost URL
-    https://dl.bintray.com/boostorg/release/1.68.0/source/boost_1_68_0.tar.gz
-    URL_MD5 5d8b4503582fffa9eefdb9045359c239 SOURCE_DIR
+    https://dl.bintray.com/boostorg/release/1.71.0/source/boost_1_71_0.tar.gz
+    URL_MD5 5f521b41b79bf8616582c4a8a2c10177 SOURCE_DIR
     "${CMAKE_BINARY_DIR}/boost-src" BINARY_DIR "${CMAKE_BINARY_DIR}/boost-build"
     CONFIGURE_COMMAND "" BUILD_COMMAND "" INSTALL_COMMAND mkdir -p
     "${CMAKE_BINARY_DIR}/prefix/include/" && cp -R
@@ -46,7 +46,7 @@ externalproject_add (
 
 externalproject_add (
     nlohmann-json GIT_REPOSITORY "https://github.com/nlohmann/json.git" GIT_TAG
-    aafad2be1f3cd259a1e79d2f6fcf267d1ede9ec7 SOURCE_DIR
+    ea60d40f4a60a47d3be9560d8f7bc37c163fe47b SOURCE_DIR
     "${CMAKE_BINARY_DIR}/nlohmann-json-src" BINARY_DIR
     "${CMAKE_BINARY_DIR}/nlohmann-json-build" CONFIGURE_COMMAND "" BUILD_COMMAND
     "" INSTALL_COMMAND mkdir -p "${CMAKE_BINARY_DIR}/prefix/include/nlohmann" &&

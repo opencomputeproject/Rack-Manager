@@ -109,11 +109,24 @@
    implement a concrete interface.
 
 11. ### phosphor webui
-   The webserver should be capable of hosting phosphor-webui, and impelmenting
+   The webserver should be capable of hosting phosphor-webui, and implementing
    the required flows to host the application.  In general, all access methods
    should be available to the webui.
 
-12. ### Developing and Testing
+12. ### Redfish
+   bmcweb's Redfish implementation, including Redfish OEM Resources, shall
+   conform to the Redfish specification. Please keep bmcweb's [Redfish support
+   document](https://github.com/openbmc/bmcweb/blob/master/Redfish.md) updated.
+   Before adding a Redfish OEM schema or property first engage the DMTF's
+   Redfish working group to see if they are interested in adding the new
+   feature. The [Redfish Specification Forum](https://redfishforum.com/) is a
+   public Redfish forum to ask questions and request features. Redfish
+   "Supporter" and "Promoter" companies, which many companies working on OpenBMC
+   are, can request features via the Redfish code repository or via Redfish
+   meetings. For more information on Redfish and supported schemas visit
+   [Redfish.md](https://github.com/openbmc/bmcweb/blob/master/Redfish.md).
+
+13. ### Developing and Testing
   There are a variety of ways to develop and test bmcweb software changes.
   Here are the steps for using the SDK and QEMU.
 
@@ -197,463 +210,26 @@
   See the [REST](https://github.com/openbmc/docs/blob/master/REST-cheatsheet.md)
   and [Redfish](https://github.com/openbmc/docs/blob/master/REDFISH-cheatsheet.md) cheatsheets for valid commands.
 
-13. ### Redfish
+  Please test all Redfish changes with the
+  [Redfish Service Validator](https://github.com/DMTF/Redfish-Service-Validator).
+  Your change should not introduce any new validator errors. Please include
+  the Redfish Service Validator results as part of the commit message
+  ["Tested" field](https://github.com/openbmc/docs/blob/master/CONTRIBUTING.md#testing).
+
+## clang-tidy
+
+clang-tidy is a tool that can be used to identify coding style violations, bad
+design patterns, and bug prone contructs.  It's not guaranteed that all tests
+pass, but ideally should be run on new code to find issues.  To run, make sure
+you have clang++-9 installed, and clang-tidy-9 installed, and run.  the -checks
+field can be modified to enable or disable which clang-tidy checks are run.
+The below enables everything in the cert namespace.
+
+```
+mkdir build
+cd build
+cmake .. -DCMAKE_CXX_COMPILER=clang++-9 -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+make -j
+run-clang-tidy-9 -p . -header-filter=".*" -checks="-*,cert-*"
+```
 
-  The redfish implementation shall pass the [Redfish Service
-  Validator](https://github.com/DMTF/Redfish-Service-Validator "Validator") with
-  no warnings or errors
-
-  The following redfish schemas and fields are targeted for OpenBMC.  This is a
-  living document, and these schemas are subject to change.
-
-  The latest Redfish schemas can be found [here](https://redfish.dmtf.org/schemas/)
-
-  Fields common to all schemas
-
-  - @odata.context
-  - @odata.id
-  - @odata.type
-  - Id
-  - Name
-
-
-  #### /redfish/v1/
-  ##### ServiceRoot
-
-  - RedfishVersion
-  - UUID
-
-
-  #### /redfish/v1/AccountService/
-  ##### AccountService
-
-  - Description
-  - ServiceEnabled
-  - MinpasswordLength
-  - MaxPasswordLength
-  - Accounts
-  - Roles
-
-  #### /redfish/v1/AccountService/Accounts/
-  ##### AccountCollection
-
-  - Description
-  - Members@odata.count
-  - Members
-
-  #### /redfish/v1/AccountService/Accounts/<AccountName>
-  ##### Account
-
-  - Description
-  - Enabled
-  - Password
-  - UserName
-  - RoleId
-  - Links/Role
-
-  #### /redfish/v1/AccountService/Roles/
-  ##### RoleCollection
-
-  - Description
-  - Members@odata.count
-  - Members
-      - By default will contain 3 roles, "Administrator", "Operator", and "User"
-
-  #### /redfish/v1/AccountService/Roles/<RoleName>
-  ##### Role
-
-  - Description
-  - IsPredefined
-      - Will be set to true for all default roles.  If the given role is
-        non-default, or has been modified from default, will be marked as false.
-  - AssignedPrivileges
-      - For the default roles, the following privileges will be assigned by
-        default
-          - Administrator: Login, ConfigureManager, ConfigureUsers, ConfigureSelf,
-            ConfigureComponents
-          - Operator: Login, ConfigureComponents
-          - User: Login
-
-
-  #### /redfish/v1/Chassis
-  ##### ChassisCollection
-
-  - Members@odata.count
-  - Members
-
-  #### /redfish/v1/Chassis/<ChassisName>
-  ##### Chassis
-
-  - ChassisType
-  - Manufacturer
-  - Model
-  - SerialNumber
-  - PartNumber
-  - PowerState
-  - Thermal
-      - Shall be included if component contains temperature sensors, otherwise
-        shall be omitted.
-  - Power
-      - Shall be included if component contains voltage/current sensing
-        components, otherwise will be omitted.
-
-  #### /redfish/v1/Chassis/<ChassisName>/Thermal
-  ##### Thermal
-  Temperatures Fans Redundancy
-
-  #### /redfish/v1/Chassis/<ChassisName>/Thermal#/Temperatures/<SensorName>
-  ##### Temperature
-  - MemberId
-  - Status
-  - ReadingCelsius
-  - UpperThresholdNonCritical
-  - UpperThresholdCritical
-  - LowerThresholdNonCritical
-  - LowerThresholdCritical
-  - MinReadingRange
-  - MaxReadingRange
-
-  *threshold fields only present if defined for sensor, otherwise absent*
-
-  #### /redfish/v1/Chassis/<ChassisName>/Thermal#/Fans/<FanName>
-  ##### Fan
-  - MemberId
-  - Status
-  - Reading
-  - ReadingUnits
-  - UpperThresholdNonCritical
-  - UpperThresholdCritical
-  - LowerThresholdNonCritical
-  - LowerThresholdCritical
-  - MinReadingRange
-  - MaxReadingRange
-  - Redundancy
-
-  *threshold fields only present if defined for sensor, otherwise absent*
-
-  #### /redfish/v1/Chassis/<ChassisName>/Thermal#/Redundancy/<RedundancyName>
-  ##### Fan
-  - MemberId
-  - RedundancySet
-  - Mode
-  - Status
-  - MinNumNeeded
-  - MaxNumSupported
-
-
-  #### /redfish/v1/Chassis/<ChassisName>/Power/
-  ##### Thermal
-  PowerControl Voltages PowerSupplies Redundancy
-
-  #### /redfish/v1/Chassis/<ChassisName>/Power#/PowerControl/<ControlName>
-  ##### PowerControl
-  - MemberId
-  - PowerConsumedWatts
-  - PowerMetrics/IntervalInMin
-  - PowerMetrics/MinConsumedWatts
-  - PowerMetrics/MaxConsumedWatts
-  - PowerMetrics/AverageConsumedWatts
-  - RelatedItem
-      - Should list systems and related chassis
-
-  #### /redfish/v1/Chassis/<ChassisName>/Power#/Voltages/<VoltageName>
-  ##### Voltage
-  - MemberId
-  - Status
-  - ReadingVolts
-  - UpperThresholdNonCritical
-  - UpperThresholdCritical
-  - LowerThresholdNonCritical
-  - LowerThresholdCritical
-  - MinReadingRange
-  - MaxReadingRange
-  - PhysicalContext
-  - RelatedItem
-
-  #### /redfish/v1/Chassis/<ChassisName>/Power#/PowerSupplies/<PSUName>
-  ##### PowerSupply
-  - MemberId
-  - Status
-  - LininputVoltage
-  - Model
-  - manufacturer
-  - FirmwareVersion
-  - SerialNumber
-  - PartNumber
-  - RelatedItem
-  - Redundancy
-
-  #### /redfish/v1/Chassis/{ChassisName}/Power#/Redundancy/<RedundancyName>
-  ##### Redundancy
-  - MemberId
-  - RedundancySet
-  - Mode
-  - Status
-  - MinNumNeeded
-  - MaxNumSupported
-
-
-  #### /redfish/v1/EventService
-  ##### EventService
-  - Id
-  - ServiceEnabled
-  - DeliveryRetryAttempts
-      - Defaults to 3
-  - EventTypesForSubscription
-      - Defaults to "Alert"
-  - Actions
-  - Subscriptions
-
-  #### /redfish/v1/EventService/Subscriptions
-  ##### EventDestinationCollection
-  - Members@odata.count
-  - Members
-
-  #### /redfish/v1/EventService/Subscriptions/{EventName}/
-  ##### EventDestination
-  - Id
-  - Destination
-  - EventTypes
-  - Context
-  - OriginResources
-  - Protocol
-
-
-  #### /redfish/v1/Managers
-  ##### ManagerCollection
-  - Members
-  - Members@odata.count
-
-  #### /redfish/v1/Managers/BMC
-  ##### Manager
-  - Description
-  - LogServices
-  - GraphicalConsole
-  - UUID
-  - Model
-  - Links
-  - PowerState
-  - FirmwareVersion
-  - ManagerType
-  - ServiceEntryPointUUID
-  - DateTime
-  - NetworkProtocol
-  - Actions
-  - Status
-  - SerialConsole
-  - VirtualMedia
-  - EthernetInterfaces
-
-  #### /redfish/v1/Managers/BMC/EthernetInterfaces
-  ##### EthernetInterfaceCollection
-  - Members
-  - Members@odata.count
-  - Description
-
-  #### /redfish/v1/Managers/BMC/EthernetInterfaces/{InterfaceName}
-  ##### EthernetInterface
-  - Description
-  - VLAN
-  - MaxIPv6StaticAddresses
-
-  #### /redfish/v1/Managers/BMC/LogServices
-  ##### LogServiceCollection
-  - Members
-  - Members@odata.count
-  - Description
-
-  #### /redfish/v1/Managers/BMC/LogServices/RedfishLog
-  ##### LogService
-  - Entries
-  - OverWritePolicy
-  - Actions
-  - Status
-  - DateTime
-  - MaxNumberOfRecords
-
-  #### /redfish/v1/Managers/BMC/LogServices/RedfishLog/Entries/{entry}
-  ##### LogEntry
-  - Message
-  - Created
-  - EntryType
-
-  #### /redfish/v1/Managers/BMC/NetworkProtocol
-  ##### ManagerNetworkProtocol
-  - Description
-  - SSDP
-  - HTTPS
-  - SSH
-  - VirtualMedia
-  - KVMIP
-  - Status
-
-
-  #### /redfish/v1/Registries
-  ##### MessageRegistryFileCollection
-  - Members
-      - Should support Base, CommonMessages, and EventingMessages
-  - Members@odata.count
-  - Description
-
-  #### /redfish/v1/Registries/<MessageRegistry>
-  ##### MessageRegistryFile
-  - Location
-  - Description
-  - Location@odata.count
-  - Languages@odata.count
-  - Languages
-  - Registry
-
-
-  #### /redfish/v1/SessionService
-  ##### SessionService
-  - Description
-  - ServiceEnabled
-  - Status
-  - SessionTimeout
-  - Sessions
-
-  #### /redfish/v1/SessionService/Sessions
-  ##### SessionCollection
-  - Members
-  - Members@odata.count
-  - Description
-
-
-  #### /redfish/v1/Systems
-  ##### ComputerSystemCollection
-  - Members
-      - Should support one system
-  - Members@odata.count
-
-  #### /redfish/v1/Systems/{SystemName}
-  ##### ComputerSystem
-  - Boot
-  - PartNumber
-  - IndicatorLED
-  - UUID
-  - LogServices
-  - SystemType
-  - Manufacturer
-  - Description
-  - Model
-  - Links
-  - PowerState
-  - BiosVersion
-  - Storage
-  - SerialNumber
-  - Processors
-  - ProcessorSummary
-  - Memory
-  - Actions
-  - Status
-  - EthernetInterfaces
-  - MemorySummary
-
-  #### /redfish/v1/Systems/{SystemName}/EthernetInterfaces
-  ##### EthernetInterfaceCollection
-  - Members
-  - Members@odata.count
-  - Description
-
-  #### /redfish/v1/Systems/{SystemName}/LogServices
-  ##### LogServiceCollection
-  - Members
-      - Should default to one member, named SEL
-  - Members@odata.count
-  - Description
-
-  #### /redfish/v1/Systems/{SystemName}/LogServices/SEL/Entries
-  ##### LogEntryCollection
-  - Members
-  - Members@odata.count
-  - Description
-  - @odata.nextLink
-
-  #### /redfish/v1/Systems/{SystemName}/LogServices/SEL/Entries/{entryNumber}
-  ##### LogEntry
-  - MessageArgs
-  - Severity
-  - SensorType
-  - Message
-  - MessageId
-  - Created
-  - EntryCode
-  - EntryType
-
-  #### /redfish/v1/Systems/{SystemName}/Memory
-  ##### MemoryCollection
-  - Members
-  - Members@odata.count
-
-  #### /redfish/v1/Systems/{SystemName}/Memory/Memory1
-  ##### Memory
-  - MemoryType
-  - Description
-  - DeviceLocator
-  - Oem
-  - Metrics
-  - BaseModuleType
-  - Manufacturer
-  - MemoryDeviceType
-  - RankCount
-  - AllowedSpeedsMHz
-  - CapacityMiB
-  - DataWidthBits
-  - SerialNumber
-  - OperatingSpeedMhz
-  - ErrorCorrection
-  - PartNumber
-  - Status
-  - BusWidthBits
-  - MemoryMedia
-
-  #### /redfish/v1/Systems/{SystemName}/Memory/Memory1/MemoryMetrics
-  ##### MemoryMetrics
-  - Description
-  - HealthData
-
-  #### /redfish/v1/Systems/{SystemName}/Processors
-  ##### ProcessorCollection
-  - Members
-      - Should Support CPU1 and CPU2 for dual socket systems
-  - Members@odata.count
-
-  #### /redfish/v1/Systems/{SystemName}/Processors/{CPUName}
-  ##### Processor
-  - ProcessorArchitecture
-  - TotalCores
-  - ProcessorId
-  - MaxSpeedMHz
-  - Manufacturer
-  - Status
-  - Socket
-  - InstructionSet
-  - Model
-  - ProcessorType
-  - TotalThreads
-
-  #### /redfish/v1/Systems/{SystemName}/Storage
-  ##### StorageCollection
-  - Members
-  - Members@odata.count
-
-  #### /redfish/v1/Systems/{SystemName}/Storage/{storageIndex>
-  ##### Storage
-  - Drives
-  - Links
-
-
-  #### /redfish/v1/UpdateService
-  ##### UpdateService
-  - SoftwareInventory
-
-  #### /redfish/v1/UpdateService/SoftwareInventory
-  ##### SoftwareInventoryCollection
-  - Members
-  - Should Support BMC, ME, CPLD and BIOS
-  - Members@odata.count
-
-  #### /redfish/v1/UpdateService/SoftwareInventory/{MemberName}
-  ##### SoftwareInventory
-  - Version

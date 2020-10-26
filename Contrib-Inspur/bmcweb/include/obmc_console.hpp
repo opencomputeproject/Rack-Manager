@@ -1,8 +1,9 @@
 #pragma once
-#include <crow/app.h>
-#include <crow/websocket.h>
+#include <app.h>
 #include <sys/socket.h>
+#include <websocket.h>
 
+#include <async_resp.hpp>
 #include <boost/container/flat_map.hpp>
 #include <boost/container/flat_set.hpp>
 #include <webserver_common.hpp>
@@ -44,7 +45,7 @@ void doWrite()
 
             if (ec == boost::asio::error::eof)
             {
-                for (auto session : sessions)
+                for (crow::websocket::Connection* session : sessions)
                 {
                     session->close("Error in reading to host port");
                 }
@@ -70,14 +71,14 @@ void doRead()
             {
                 BMCWEB_LOG_ERROR << "Couldn't read from host serial port: "
                                  << ec;
-                for (auto session : sessions)
+                for (crow::websocket::Connection* session : sessions)
                 {
                     session->close("Error in connecting to host port");
                 }
                 return;
             }
-            boost::beast::string_view payload(outputBuffer.data(), bytesRead);
-            for (auto session : sessions)
+            std::string_view payload(outputBuffer.data(), bytesRead);
+            for (crow::websocket::Connection* session : sessions)
             {
                 session->sendBinary(payload);
             }
@@ -90,7 +91,7 @@ void connectHandler(const boost::system::error_code& ec)
     if (ec)
     {
         BMCWEB_LOG_ERROR << "Couldn't connect to host serial port: " << ec;
-        for (auto session : sessions)
+        for (crow::websocket::Connection* session : sessions)
         {
             session->close("Error in connecting to host port");
         }
@@ -104,8 +105,10 @@ void connectHandler(const boost::system::error_code& ec)
 void requestRoutes(CrowApp& app)
 {
     BMCWEB_ROUTE(app, "/console0")
+        .requires({"ConfigureComponents", "ConfigureManager"})
         .websocket()
-        .onopen([](crow::websocket::Connection& conn) {
+        .onopen([](crow::websocket::Connection& conn,
+                   std::shared_ptr<bmcweb::AsyncResp> asyncResp) {
             BMCWEB_LOG_DEBUG << "Connection " << &conn << " opened";
 
             sessions.insert(&conn);

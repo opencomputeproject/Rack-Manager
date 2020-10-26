@@ -17,7 +17,7 @@
 
 #include "node.hpp"
 
-#include <systemd/sd-id128.h>
+#include <utils/systemd_utils.hpp>
 
 namespace redfish
 {
@@ -27,6 +27,8 @@ class ServiceRoot : public Node
   public:
     ServiceRoot(CrowApp& app) : Node(app, "/redfish/v1/")
     {
+        uuid = app.template getMiddleware<crow::persistent_data::Middleware>()
+                   .systemUuid;
         entityPrivileges = {
             {boost::beast::http::verb::get, {}},
             {boost::beast::http::verb::head, {}},
@@ -40,7 +42,7 @@ class ServiceRoot : public Node
     void doGet(crow::Response& res, const crow::Request& req,
                const std::vector<std::string>& params) override
     {
-        res.jsonValue["@odata.type"] = "#ServiceRoot.v1_1_1.ServiceRoot";
+        res.jsonValue["@odata.type"] = "#ServiceRoot.v1_5_0.ServiceRoot";
         res.jsonValue["@odata.id"] = "/redfish/v1";
         res.jsonValue["@odata.context"] =
             "/redfish/v1/$metadata#ServiceRoot.ServiceRoot";
@@ -63,31 +65,13 @@ class ServiceRoot : public Node
 
         res.jsonValue["UpdateService"] = {
             {"@odata.id", "/redfish/v1/UpdateService"}};
-
-        res.jsonValue["UUID"] = getUuid();
+        res.jsonValue["UUID"] = uuid;
+        res.jsonValue["CertificateService"] = {
+            {"@odata.id", "/redfish/v1/CertificateService"}};
         res.end();
     }
 
-    const std::string getUuid()
-    {
-        std::string ret;
-        // This ID needs to match the one in ipmid
-        sd_id128_t appId = SD_ID128_MAKE(e0, e1, 73, 76, 64, 61, 47, da, a5, 0c,
-                                         d0, cc, 64, 12, 45, 78);
-        sd_id128_t machineId = SD_ID128_NULL;
-
-        if (sd_id128_get_machine_app_specific(appId, &machineId) == 0)
-        {
-            std::array<char, SD_ID128_STRING_MAX> str;
-            ret = sd_id128_to_string(machineId, str.data());
-            ret.insert(8, 1, '-');
-            ret.insert(13, 1, '-');
-            ret.insert(18, 1, '-');
-            ret.insert(23, 1, '-');
-        }
-
-        return ret;
-    }
+    std::string uuid;
 };
 
 } // namespace redfish

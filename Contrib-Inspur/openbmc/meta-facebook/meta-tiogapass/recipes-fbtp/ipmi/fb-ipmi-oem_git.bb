@@ -5,7 +5,7 @@ LICENSE = "Apache-2.0"
 LIC_FILES_CHKSUM = "file://LICENSE;md5=9e69ba356fa59848ffd865152a3ccc13"
 
 SRC_URI = "git://github.com/openbmc/fb-ipmi-oem"
-SRCREV = "1b6fae3f3a3d0cd4e1c813a492e19d7edb55b4e9"
+SRCREV = "317999d3ac917654950e1288171b0cd546754880"
 
 S = "${WORKDIR}/git"
 PV = "0.1+git${SRCPV}"
@@ -20,6 +20,10 @@ LIBRARY_NAMES = "libzfboemcmds.so"
 
 HOSTIPMI_PROVIDER_LIBRARY += "${LIBRARY_NAMES}"
 NETIPMI_PROVIDER_LIBRARY += "${LIBRARY_NAMES}"
+
+FILES_${PN}_append = " ${datadir}/lcd-debug/post_desc.json"
+FILES_${PN}_append = " ${datadir}/lcd-debug/gpio_desc.json"
+FILES_${PN}_append = " ${datadir}/lcd-debug/cri_sensors.json"
 
 FILES_${PN}_append = " ${libdir}/ipmid-providers/lib*${SOLIBS}"
 FILES_${PN}_append = " ${libdir}/host-ipmid/lib*${SOLIBS}"

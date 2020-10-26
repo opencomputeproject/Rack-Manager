@@ -1,14 +1,13 @@
 #pragma once
 
-#include "filesystem.hpp"
-
-#include <crow/app.h>
-#include <crow/http_request.h>
-#include <crow/http_response.h>
-#include <crow/routing.h>
+#include <app.h>
+#include <http_request.h>
+#include <http_response.h>
+#include <routing.h>
 
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/container/flat_set.hpp>
+#include <filesystem>
 #include <fstream>
 #include <string>
 
@@ -158,6 +157,6 @@ template <typename... Middlewares> void requestRoutes(Crow<Middlewares...>& app)
                 });
         }
     }
-} // namespace webassets
+}
 } // namespace webassets
 } // namespace crow

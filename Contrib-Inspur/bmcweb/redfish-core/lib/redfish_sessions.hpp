@@ -35,7 +35,8 @@ class Sessions : public Node
             {boost::beast::http::verb::head, {{"Login"}}},
             {boost::beast::http::verb::patch, {{"ConfigureManager"}}},
             {boost::beast::http::verb::put, {{"ConfigureManager"}}},
-            {boost::beast::http::verb::delete_, {{"ConfigureManager"}}},
+            {boost::beast::http::verb::delete_,
+             {{"ConfigureManager"}, {"ConfigureSelf"}}},
             {boost::beast::http::verb::post, {{"ConfigureManager"}}}};
     }
 
@@ -43,6 +44,7 @@ class Sessions : public Node
     void doGet(crow::Response& res, const crow::Request& req,
                const std::vector<std::string>& params) override
     {
+        // Note that control also reaches here via doPost and doDelete.
         auto session =
             crow::persistent_data::SessionStore::getInstance().getSessionByUid(
                 params[0]);
@@ -93,6 +95,22 @@ class Sessions : public Node
             return;
         }
 
+        // Perform a proper ConfigureSelf authority check.  If a
+        // session is being used to DELETE some other user's session,
+        // then the ConfigureSelf privilege does not apply.  In that
+        // case, perform the authority check again without the user's
+        // ConfigureSelf privilege.
+        if (session->username != req.session->username)
+        {
+            if (!isAllowedWithoutConfigureSelf(req))
+            {
+                BMCWEB_LOG_WARNING << "DELETE Session denied access";
+                messages::insufficientPrivilege(res);
+                res.end();
+                return;
+            }
+        }
+
         // DELETE should return representation of object that will be removed
         doGet(res, req, params);
 
@@ -139,6 +157,7 @@ class SessionCollection : public Node
             res.jsonValue["Members"].push_back(
                 {{"@odata.id", "/redfish/v1/SessionService/Sessions/" + *uid}});
         }
+        res.jsonValue["Members@odata.count"] = sessionIds.size();
         res.jsonValue["@odata.type"] = "#SessionCollection.SessionCollection";
         res.jsonValue["@odata.id"] = "/redfish/v1/SessionService/Sessions/";
         res.jsonValue["@odata.context"] =
@@ -177,7 +196,7 @@ class SessionCollection : public Node
             return;
         }
 
-        if (!pamAuthenticateUser(username, password))
+        if (pamAuthenticateUser(username, password) != PAM_SUCCESS)
         {
             messages::resourceAtUriUnauthorized(res, std::string(req.url),
                                                 "Invalid username or password");

@@ -36,6 +36,11 @@ using ManagedObjectType = std::vector<
                   std::string,
                   boost::container::flat_map<std::string, DbusVariantType>>>>;
 
+using ManagedItem = std::pair<
+    sdbusplus::message::object_path,
+    boost::container::flat_map<
+        std::string, boost::container::flat_map<std::string, DbusVariantType>>>;
+
 inline void escapePathForDbus(std::string& path)
 {
     const std::regex reg("[^A-Za-z0-9_/]");
@@ -48,9 +53,9 @@ inline bool getNthStringFromPath(const std::string& path, int index,
                                  std::string& result)
 {
     int count = 0;
-    auto first = path.begin();
-    auto last = path.end();
-    for (auto it = path.begin(); it < path.end(); it++)
+    std::string::const_iterator first = path.begin();
+    std::string::const_iterator last = path.end();
+    for (std::string::const_iterator it = path.begin(); it < path.end(); it++)
     {
         // skip first character as it's either a leading slash or the first
         // character in the word
@@ -80,8 +85,26 @@ inline bool getNthStringFromPath(const std::string& path, int index,
     {
         first++;
     }
-    result = path.substr(first - path.begin(), last - first);
+    result = path.substr(static_cast<size_t>(first - path.begin()),
+                         static_cast<size_t>(last - first));
     return true;
+}
+
+template <typename Callback>
+inline void checkDbusPathExists(const std::string& path, Callback&& callback)
+{
+    using GetObjectType =
+        std::vector<std::pair<std::string, std::vector<std::string>>>;
+
+    crow::connections::systemBus->async_method_call(
+        [callback{std::move(callback)}](const boost::system::error_code ec,
+                                        const GetObjectType& object_names) {
+            callback(!ec && object_names.size() != 0);
+        },
+        "xyz.openbmc_project.ObjectMapper",
+        "/xyz/openbmc_project/object_mapper",
+        "xyz.openbmc_project.ObjectMapper", "GetObject", path,
+        std::array<std::string, 0>());
 }
 
 } // namespace utility

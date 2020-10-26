@@ -18,10 +18,10 @@ DEPENDS += "autoconf-archive-native \
 SRC_URI += "git://github.com/openbmc/obmc-console"
 SRC_URI += "file://${BPN}.conf"
 
-SRCREV = "1cecc5deeae236e9886f624ea7168e075f057047"
+SRCREV = "c5ce2cbd12e395749c3b4abedf0d81f49b402b70"
 PV = "1.0+git${SRCPV}"
 
-REGISTERED_SERVICES_${PN} += "obmc_console:tcp:2200"
+REGISTERED_SERVICES_${PN} += "obmc_console:tcp:2200:"
 OBMC_CONSOLE_HOST_TTY ?= "ttyVUART0"
 SYSTEMD_SUBSTITUTIONS += "OBMC_CONSOLE_HOST_TTY:${OBMC_CONSOLE_HOST_TTY}:${PN}-ssh@.service"
 SYSTEMD_SUBSTITUTIONS += "OBMC_CONSOLE_HOST_TTY:${OBMC_CONSOLE_HOST_TTY}:${PN}-ssh.socket"

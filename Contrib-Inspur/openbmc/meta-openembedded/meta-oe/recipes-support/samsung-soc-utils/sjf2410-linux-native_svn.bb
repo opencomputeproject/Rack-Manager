@@ -7,11 +7,12 @@ SRCREV = "4268"
 PV = "0.1+svnr${SRCPV}"
 PR = "r1"
 
-SRC_URI = "svn://svn.openmoko.org/trunk/src/host/;module=sjf2410-linux;protocol=http"
+SRC_URI = "svn://svn.openmoko.org/trunk/src/host/;module=sjf2410-linux;protocol=http \
+           file://0001-ppt.c-Do-not-include-sys-io.h.patch \
+          "
 S = "${WORKDIR}/sjf2410-linux"
 
 inherit native deploy
-do_deploy[sstate-outputdirs] = "${DEPLOY_DIR_TOOLS}"
 
 CFLAGS += "-DLINUX_PPDEV"
 
@@ -25,8 +26,15 @@ do_install() {
 }
 
 do_deploy() {
-    install -d ${DEPLOY_DIR_TOOLS}
-    install -m 0755 sjf2410 ${DEPLOY_DIR_TOOLS}/sjf2410-${PV}
+    install -m 0755 sjf2410 ${DEPLOYDIR}/sjf2410-${PV}
 }
 
 addtask deploy before do_build after do_install
+
+do_deploy[sstate-outputdirs] = "${DEPLOY_DIR_TOOLS}"
+# cleandirs should possibly be in deploy.bbclass but we need it
+do_deploy[cleandirs] = "${DEPLOYDIR}"
+# clear stamp-extra-info since MACHINE_ARCH is normally put there by
+# deploy.bbclass
+do_deploy[stamp-extra-info] = ""
+

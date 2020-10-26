@@ -50,9 +50,9 @@ Witherspoon| ```meta-ibm/meta-witherspoon/conf```
 Romulus| ```meta-ibm/meta-romulus/conf```
 
 
-As an example target Palmetto
+As an example target Romulus
 ```
-export TEMPLATECONF=meta-ibm/meta-palmetto/conf
+export TEMPLATECONF=meta-ibm/meta-romulus/conf
 ```
 
 ### 4) Build
@@ -64,6 +64,12 @@ bitbake obmc-phosphor-image
 
 Additional details can be found in the [docs](https://github.com/openbmc/docs)
 repository.
+
+## OpenBMC Development
+
+The OpenBMC community maintains a set of tutorials new users can go through
+to get up to speed on OpenBMC development out
+[here](https://github.com/openbmc/docs/blob/master/development/README.md)
 
 ## Build Validation and Testing
 Commits submitted by members of the OpenBMC GitHub community are compiled and
@@ -94,6 +100,20 @@ cases.
 GitHub.  It is recommended you search through the issues before opening
 a new one.
 
+## Questions
+
+First, please do a search on the internet. There's a good chance your question
+has already been asked.
+
+For general questions, please use the openbmc tag on
+[Stack Overflow](https://stackoverflow.com/questions/tagged/openbmc).
+Please review the [discussion](https://meta.stackexchange.com/questions/272956/a-new-code-license-the-mit-this-time-with-attribution-required?cb=1)
+on Stack Overflow licensing before posting any code.
+
+For technical discussions, please see [contact info](#contact) below for IRC and
+mailing list information. Please don't file an issue to ask a question. You'll
+get faster results by using the mailing list or IRC.
+
 ## Features of OpenBMC
 
 **Feature List**
@@ -107,11 +127,11 @@ a new one.
 * Remote KVM
 * Hardware Simulation
 * Automated Testing
+* User management
+* Virtual media
 
 **Features In Progress**
 * OpenCompute Redfish Compliance
-* User management
-* Virtual media
 * Verified Boot
 
 **Features Requested but need help**
@@ -122,6 +142,17 @@ a new one.
 
 Dive deeper into OpenBMC by opening the
 [docs](https://github.com/openbmc/docs) repository.
+
+## Technical Steering Committee
+
+The Technical Steering Committee (TSC) guides the project. Members are:
+
+ * Brad Bishop (chair), IBM
+ * Nancy Yuen, Google
+ * Sai Dasari, Facebook
+ * James Mihm, Intel
+ * Sagar Dharia, Microsoft
+ * Supreeth Venkatesh, Arm
 
 ## Contact
 - Mail: openbmc@lists.ozlabs.org [https://lists.ozlabs.org/listinfo/openbmc](https://lists.ozlabs.org/listinfo/openbmc)

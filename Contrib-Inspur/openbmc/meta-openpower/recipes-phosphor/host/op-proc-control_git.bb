@@ -11,17 +11,25 @@ inherit autotools obmc-phosphor-utils pkgconfig pythonnative
 inherit systemd
 
 SRC_URI += "git://github.com/openbmc/openpower-proc-control"
-SRCREV = "b964c928156c2e71fe3bc9a2693b02cfbba5309c"
+SRCREV = "ce042fe87db46d58ab5b73d5ce3ccd126bdc60c7"
 
 DEPENDS += " \
         autoconf-archive-native \
         phosphor-logging \
         phosphor-dbus-interfaces \
         openpower-dbus-interfaces \
+        libgpiod \
         "
+
+# For libpdbg, provided by the pdbg package
+DEPENDS += "pdbg"
 
 TEMPLATE = "pcie-poweroff@.service"
 INSTANCE_FORMAT = "pcie-poweroff@{}.service"
 INSTANCES = "${@compose_list(d, 'INSTANCE_FORMAT', 'OBMC_CHASSIS_INSTANCES')}"
 SYSTEMD_PACKAGES = "${PN}"
 SYSTEMD_SERVICE_${PN} = "${TEMPLATE} ${INSTANCES}"
+
+SYSTEMD_SERVICE_${PN} +=  " \
+                         xyz.openbmc_project.Control.Host.NMI.service \
+                         "
