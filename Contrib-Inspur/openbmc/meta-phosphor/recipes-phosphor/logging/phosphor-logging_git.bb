@@ -23,6 +23,7 @@ DEPENDS += "virtual/phosphor-logging-callouts"
 DEPENDS += "phosphor-logging-error-logs-native"
 DEPENDS += "phosphor-logging-native"
 DEPENDS += "libcereal"
+DEPENDS += "sdeventplus"
 
 PACKAGE_BEFORE_PN = "${PN}-test"
 FILES_${PN}-test = "${bindir}/*-test"
@@ -53,7 +54,7 @@ FILES_phosphor-rsyslog-config += " \
 "
 
 SRC_URI += "git://github.com/openbmc/phosphor-logging"
-SRCREV = "3b81846a764c4f87977b726188df224c0107c760"
+SRCREV = "e2d1bf317c0ddf25ddd305aa8f3c6f09118f799c"
 
 S = "${WORKDIR}/git"
 
@@ -64,6 +65,7 @@ DEPENDS_remove_class-native = " \
         sdbus++ \
         systemd \
         libcereal \
+        sdeventplus \
         "
 
 # Do not DEPEND on the specified packages for native SDK build
@@ -74,6 +76,7 @@ DEPENDS_remove_class-nativesdk = " \
         libcereal \
         systemd \
         phosphor-dbus-interfaces \
+        sdeventplus \
         "
 
 PACKAGECONFIG ??= "metadata-processing install_scripts"
@@ -87,6 +90,13 @@ PACKAGECONFIG[metadata-processing] = " \
 PACKAGECONFIG[install_scripts] = " \
         --enable-install_scripts, \
         --disable-install_scripts, ,\
+        "
+
+PACKAGECONFIG[openpower-pels] = " \
+        --enable-openpower-pel-extension, \
+        --disable-openpower-pel-extension, \
+        nlohmann-json nlohmann-fifo cli11 pldm, \
+        , \
         "
 
 # Enable install_scripts during native and native SDK build

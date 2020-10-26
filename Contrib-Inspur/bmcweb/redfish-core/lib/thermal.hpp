@@ -30,13 +30,17 @@ class Thermal : public Node
         entityPrivileges = {
             {boost::beast::http::verb::get, {{"Login"}}},
             {boost::beast::http::verb::head, {{"Login"}}},
-            {boost::beast::http::verb::patch, {{"ConfigureManager"}}},
+            {boost::beast::http::verb::patch, {{"ConfigureComponents"}}},
             {boost::beast::http::verb::put, {{"ConfigureManager"}}},
             {boost::beast::http::verb::delete_, {{"ConfigureManager"}}},
             {boost::beast::http::verb::post, {{"ConfigureManager"}}}};
     }
 
   private:
+    std::vector<const char*> typeList = {
+        "/xyz/openbmc_project/sensors/fan_tach",
+        "/xyz/openbmc_project/sensors/temperature",
+        "/xyz/openbmc_project/sensors/fan_pwm"};
     void doGet(crow::Response& res, const crow::Request& req,
                const std::vector<std::string>& params) override
     {
@@ -47,26 +51,54 @@ class Thermal : public Node
             return;
         }
         const std::string& chassisName = params[0];
-
-        res.jsonValue["@odata.type"] = "#Thermal.v1_4_0.Thermal";
-        res.jsonValue["@odata.context"] =
-            "/redfish/v1/$metadata#Thermal.Thermal";
-        res.jsonValue["Id"] = "Thermal";
-        res.jsonValue["Name"] = "Thermal";
-
-        res.jsonValue["@odata.id"] =
-            "/redfish/v1/Chassis/" + chassisName + "/Thermal";
-
         auto sensorAsyncResp = std::make_shared<SensorsAsyncResp>(
-            res, chassisName,
-            std::initializer_list<const char*>{
-                "/xyz/openbmc_project/sensors/fan",
-                "/xyz/openbmc_project/sensors/temperature",
-                "/xyz/openbmc_project/sensors/fan_pwm"},
-            "Thermal");
+            res, chassisName, typeList, "Thermal");
 
         // TODO Need to get Chassis Redundancy information.
         getChassisData(sensorAsyncResp);
+    }
+    void doPatch(crow::Response& res, const crow::Request& req,
+                 const std::vector<std::string>& params) override
+    {
+        if (params.size() != 1)
+        {
+            res.end();
+            messages::internalError(res);
+            return;
+        }
+
+        const std::string& chassisName = params[0];
+        std::optional<std::vector<nlohmann::json>> temperatureCollections;
+        std::optional<std::vector<nlohmann::json>> fanCollections;
+        std::unordered_map<std::string, std::vector<nlohmann::json>>
+            allCollections;
+
+        auto asyncResp = std::make_shared<SensorsAsyncResp>(
+            res, chassisName, typeList, "Thermal");
+
+        if (!json_util::readJson(req, asyncResp->res, "Temperatures",
+                                 temperatureCollections, "Fans",
+                                 fanCollections))
+        {
+            return;
+        }
+        if (!temperatureCollections && !fanCollections)
+        {
+            messages::resourceNotFound(asyncResp->res, "Thermal",
+                                       "Temperatures / Voltages");
+            return;
+        }
+        if (temperatureCollections)
+        {
+            allCollections.emplace("Temperatures",
+                                   *std::move(temperatureCollections));
+        }
+        if (fanCollections)
+        {
+            allCollections.emplace("Fans", *std::move(fanCollections));
+        }
+
+        setSensorOverride(asyncResp, allCollections, chassisName, typeList);
     }
 };
 

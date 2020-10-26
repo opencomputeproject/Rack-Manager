@@ -20,6 +20,7 @@ INHIBIT_DEFAULT_DEPS = "1"
 PITFT="${@bb.utils.contains("MACHINE_FEATURES", "pitft", "1", "0", d)}"
 PITFT22="${@bb.utils.contains("MACHINE_FEATURES", "pitft22", "1", "0", d)}"
 PITFT28r="${@bb.utils.contains("MACHINE_FEATURES", "pitft28r", "1", "0", d)}"
+PITFT28c="${@bb.utils.contains("MACHINE_FEATURES", "pitft28c", "1", "0", d)}"
 PITFT35r="${@bb.utils.contains("MACHINE_FEATURES", "pitft35r", "1", "0", d)}"
 
 VC4GRAPHICS="${@bb.utils.contains("MACHINE_FEATURES", "vc4graphics", "1", "0", d)}"
@@ -41,7 +42,7 @@ do_deploy() {
     if [ -n "${DISABLE_OVERSCAN}" ]; then
         sed -i '/#disable_overscan=/ c\disable_overscan=${DISABLE_OVERSCAN}' ${DEPLOYDIR}/bcm2835-bootfiles/config.txt
     fi
-    if [ -n "${DISABLE_SPLASH}" ]; then
+    if [ "${DISABLE_SPLASH}" = "1" ]; then
         sed -i '/#disable_splash=/ c\disable_splash=${DISABLE_SPLASH}' ${DEPLOYDIR}/bcm2835-bootfiles/config.txt
     fi
 
@@ -111,25 +112,25 @@ do_deploy() {
     fi
 
     # Video camera support
-    if [ -n "${VIDEO_CAMERA}" ]; then
+    if [ "${VIDEO_CAMERA}" = "1" ]; then
         echo "# Enable video camera" >>${DEPLOYDIR}/bcm2835-bootfiles/config.txt
         echo "start_x=1" >>${DEPLOYDIR}/bcm2835-bootfiles/config.txt
     fi
 
     # Offline compositing support
-    if [ -n "${DISPMANX_OFFLINE}" ]; then
+    if [ "${DISPMANX_OFFLINE}" = "1" ]; then
         echo "# Enable offline compositing" >>${DEPLOYDIR}/bcm2835-bootfiles/config.txt
         echo "dispmanx_offline=1" >>${DEPLOYDIR}/bcm2835-bootfiles/config.txt
     fi
 
     # SPI bus support
-    if [ -n "${ENABLE_SPI_BUS}" ] || [ "${PITFT}" = "1" ]; then
+    if [ "${ENABLE_SPI_BUS}" = "1" ] || [ "${PITFT}" = "1" ]; then
         echo "# Enable SPI bus" >>${DEPLOYDIR}/bcm2835-bootfiles/config.txt
         echo "dtparam=spi=on" >>${DEPLOYDIR}/bcm2835-bootfiles/config.txt
     fi
 
     # I2C support
-    if [ -n "${ENABLE_I2C}" ] || [ "${PITFT}" = "1" ]; then
+    if [ "${ENABLE_I2C}" = "1" ] || [ "${PITFT}" = "1" ]; then
         echo "# Enable I2C" >>${DEPLOYDIR}/bcm2835-bootfiles/config.txt
         echo "dtparam=i2c1=on" >>${DEPLOYDIR}/bcm2835-bootfiles/config.txt
         echo "dtparam=i2c_arm=on" >>${DEPLOYDIR}/bcm2835-bootfiles/config.txt
@@ -143,6 +144,11 @@ do_deploy() {
     if [ "${PITFT28r}" = "1" ]; then
         echo "# Enable PITFT28r display" >>${DEPLOYDIR}/bcm2835-bootfiles/config.txt
         echo "dtoverlay=pitft28-resistive,rotate=90,speed=32000000,txbuflen=32768" >>${DEPLOYDIR}/bcm2835-bootfiles/config.txt
+    fi
+    if [ "${PITFT28c}" = "1" ]; then
+        echo "# Enable PITFT28c display" >>${DEPLOYDIR}/bcm2835-bootfiles/config.txt
+        echo "dtoverlay=pitft28-capacitive,rotate=90,speed=32000000,txbuflen=32768" >>${DEPLOYDIR}/bcm2835-bootfiles/config.txt
+        echo "dtoverlay=pitft28-capacitive,touch-swapxy,touch-invx" >>${DEPLOYDIR}/bcm2835-bootfiles/config.txt
     fi
     if [ "${PITFT35r}" = "1" ]; then
         echo "# Enable PITFT35r display" >>${DEPLOYDIR}/bcm2835-bootfiles/config.txt
@@ -191,6 +197,17 @@ do_deploy() {
 
     # Append extra config if the user has provided any
     printf "${RPI_EXTRA_CONFIG}\n" >> ${DEPLOYDIR}/bcm2835-bootfiles/config.txt
+
+    # Handle setup with armstub file
+    if [ "${@bb.utils.contains("MACHINE_FEATURES", "armstub", "1", "0", d)}" = "1" ]; then
+        echo "\n# ARM stub configuration" >> ${DEPLOYDIR}/bcm2835-bootfiles/config.txt
+        echo "armstub=${ARMSTUB}" >> ${DEPLOYDIR}/bcm2835-bootfiles/config.txt
+        case "${ARMSTUB}" in
+            *-gic.bin)
+                echo  "enable_gic=1" >> ${DEPLOYDIR}/bcm2835-bootfiles/config.txt
+                ;;
+        esac
+    fi
 }
 
 do_deploy_append_raspberrypi3-64() {

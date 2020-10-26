@@ -20,4 +20,9 @@ RDEPENDS_${PN}-system = " \
         phosphor-ipmi-ipmb \
         fb-ipmi-oem \
         phosphor-pid-control \
+        phosphor-hostlogger \
+        phosphor-sel-logger \
+        ipmitool \
+        phosphor-post-code-manager \
+        phosphor-host-postd \
         "

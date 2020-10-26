@@ -14,12 +14,23 @@ inline int pamFunctionConversation(int numMsg, const struct pam_message** msg,
     {
         return PAM_AUTH_ERR;
     }
-    auto* pass = reinterpret_cast<char*>(
-        malloc(std::strlen(reinterpret_cast<char*>(appdataPtr)) + 1));
-    std::strcpy(pass, reinterpret_cast<char*>(appdataPtr));
+    char* appPass = reinterpret_cast<char*>(appdataPtr);
+    size_t appPassSize = std::strlen(appPass);
+    char* pass = reinterpret_cast<char*>(malloc(appPassSize + 1));
+    if (pass == nullptr)
+    {
+        return PAM_AUTH_ERR;
+    }
+
+    std::strcpy(pass, appPass);
 
     *resp = reinterpret_cast<pam_response*>(
-        calloc(numMsg, sizeof(struct pam_response)));
+        calloc(static_cast<size_t>(numMsg), sizeof(struct pam_response)));
+
+    if (resp == nullptr)
+    {
+        return PAM_AUTH_ERR;
+    }
 
     for (int i = 0; i < numMsg; ++i)
     {
@@ -36,69 +47,67 @@ inline int pamFunctionConversation(int numMsg, const struct pam_message** msg,
     return PAM_SUCCESS;
 }
 
-inline bool pamAuthenticateUser(const boost::string_view username,
-                                const boost::string_view password)
+/**
+ * @brief Attempt username/password authentication via PAM.
+ * @param username The provided username aka account name.
+ * @param password The provided password.
+ * @returns PAM error code or PAM_SUCCESS for success. */
+inline int pamAuthenticateUser(const std::string_view username,
+                               const std::string_view password)
 {
     std::string userStr(username);
     std::string passStr(password);
     const struct pam_conv localConversation = {
         pamFunctionConversation, const_cast<char*>(passStr.c_str())};
-    pam_handle_t* localAuthHandle = NULL; // this gets set by pam_start
+    pam_handle_t* localAuthHandle = nullptr; // this gets set by pam_start
 
-    if (pam_start("webserver", userStr.c_str(), &localConversation,
-                  &localAuthHandle) != PAM_SUCCESS)
-    {
-        return false;
-    }
-    int retval = pam_authenticate(localAuthHandle,
-                                  PAM_SILENT | PAM_DISALLOW_NULL_AUTHTOK);
-
+    int retval = pam_start("webserver", userStr.c_str(), &localConversation,
+                           &localAuthHandle);
     if (retval != PAM_SUCCESS)
     {
-        pam_end(localAuthHandle, PAM_SUCCESS);
-        return false;
+        return retval;
+    }
+
+    retval = pam_authenticate(localAuthHandle,
+                              PAM_SILENT | PAM_DISALLOW_NULL_AUTHTOK);
+    if (retval != PAM_SUCCESS)
+    {
+        pam_end(localAuthHandle, PAM_SUCCESS); // ignore retval
+        return retval;
     }
 
     /* check that the account is healthy */
-    if (pam_acct_mgmt(localAuthHandle, PAM_DISALLOW_NULL_AUTHTOK) !=
-        PAM_SUCCESS)
+    retval = pam_acct_mgmt(localAuthHandle, PAM_DISALLOW_NULL_AUTHTOK);
+    if (retval != PAM_SUCCESS)
     {
-        pam_end(localAuthHandle, PAM_SUCCESS);
-        return false;
+        pam_end(localAuthHandle, PAM_SUCCESS); // ignore retval
+        return retval;
     }
 
-    if (pam_end(localAuthHandle, PAM_SUCCESS) != PAM_SUCCESS)
-    {
-        return false;
-    }
-
-    return true;
+    return pam_end(localAuthHandle, PAM_SUCCESS);
 }
 
-inline bool pamUpdatePassword(const std::string& username,
-                              const std::string& password)
+inline int pamUpdatePassword(const std::string& username,
+                             const std::string& password)
 {
     const struct pam_conv localConversation = {
         pamFunctionConversation, const_cast<char*>(password.c_str())};
-    pam_handle_t* localAuthHandle = NULL; // this gets set by pam_start
+    pam_handle_t* localAuthHandle = nullptr; // this gets set by pam_start
 
-    if (pam_start("passwd", username.c_str(), &localConversation,
-                  &localAuthHandle) != PAM_SUCCESS)
-    {
-        return false;
-    }
-    int retval = pam_chauthtok(localAuthHandle, PAM_SILENT);
+    int retval = pam_start("webserver", username.c_str(), &localConversation,
+                           &localAuthHandle);
 
     if (retval != PAM_SUCCESS)
     {
-        pam_end(localAuthHandle, PAM_SUCCESS);
-        return false;
+        return retval;
     }
 
-    if (pam_end(localAuthHandle, PAM_SUCCESS) != PAM_SUCCESS)
+    retval = pam_chauthtok(localAuthHandle, PAM_SILENT);
+    if (retval != PAM_SUCCESS)
     {
-        return false;
+        pam_end(localAuthHandle, PAM_SUCCESS);
+        return retval;
     }
 
-    return true;
+    return pam_end(localAuthHandle, PAM_SUCCESS);
 }

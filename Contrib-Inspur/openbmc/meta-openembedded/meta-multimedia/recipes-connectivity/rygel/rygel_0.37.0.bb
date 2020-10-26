@@ -12,7 +12,6 @@ DEPENDS = "libxml2 glib-2.0 gssdp gupnp gupnp-av gupnp-dlna gstreamer1.0 gstream
 RDEPENDS_${PN} = "gstreamer1.0-plugins-base-playback shared-mime-info"
 RRECOMMENDS_${PN} = "rygel-plugin-media-export"
 
-GNOME_COMPRESS_TYPE = "xz"
 SRC_URI[archive.md5sum] = "f897167ad82e2e741582f2c393a76843"
 SRC_URI[archive.sha256sum] = "dfd3d885da3ac383ba0cfbf119995f4a0c2bca2cc8f8cfcd3df10cfec8f35cd7"
 
@@ -38,10 +37,12 @@ do_install_append() {
        # Remove .la files for loadable modules
        rm -f ${D}/${libdir}/rygel-${LIBV}/engines/*.la
        rm -f ${D}/${libdir}/rygel-${LIBV}/plugins/*.la
-       if [ -e ${D}${libdir}/systemd/user/rygel.service ]; then
+       if [ -e ${D}${nonarch_libdir}/systemd/user/rygel.service ]; then
                mkdir -p ${D}${systemd_unitdir}/system
-               mv ${D}${libdir}/systemd/user/rygel.service ${D}${systemd_unitdir}/system
-               rmdir ${D}${libdir}/systemd/user ${D}${libdir}/systemd
+               mv ${D}${nonarch_libdir}/systemd/user/rygel.service ${D}${systemd_unitdir}/system
+               rmdir --ignore-fail-on-non-empty ${D}${nonarch_libdir}/systemd/user \
+               ${D}${nonarch_libdir}/systemd \
+               ${D}${nonarch_libdir}
        fi
 }
 

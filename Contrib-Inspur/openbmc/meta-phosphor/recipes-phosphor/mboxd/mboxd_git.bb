@@ -17,18 +17,13 @@ S = "${WORKDIR}/git"
 SRC_URI += "git://github.com/openbmc/mboxbridge.git"
 
 SRC_URI += "file://99-aspeed-lpc-ctrl.rules"
-SRC_URI += "file://aspeed-lpc-ctrl-h.patch"
 
-SRCREV="4b8203d721b1114f09712e5ca04e18d10147d8cd"
+SRCREV="02821c6ae4b04d21cf0efb175b382c52aad93fc0"
 
 PROVIDES += "mboxctl"
 
 MBOXD_FLASH_SIZE ??= "32M"
 SYSTEMD_SUBSTITUTIONS += "FLASH_SIZE:${MBOXD_FLASH_SIZE}:${PN}.service"
-
-# Hacks because ${STAGING_KERNEL_DIR} points to the kernel source tree, not the
-# installed, pre-processed headers. Requires the aspeed-lpc-ctrl-h patch above.
-CFLAGS_append = " -I include"
 
 do_install_append() {
     install -d ${D}/lib/udev/rules.d
@@ -36,13 +31,13 @@ do_install_append() {
 }
 
 TMPL = "mboxd-reload@.service"
-TGTFMT = "obmc-chassis-poweron@{0}.target"
+TGTFMT = "obmc-host-startmin@{0}.target"
 INSTFMT = "mboxd-reload@{0}.service"
 FMT = "../${TMPL}:${TGTFMT}.wants/${INSTFMT}"
 
 SYSTEMD_SERVICE_${PN} += "mboxd.service"
 SYSTEMD_SERVICE_${PN} += "mboxd-reload@.service"
-SYSTEMD_LINK_${PN} += "${@compose_list(d, 'FMT', 'OBMC_CHASSIS_INSTANCES')}"
+SYSTEMD_LINK_${PN} += "${@compose_list(d, 'FMT', 'OBMC_HOST_INSTANCES')}"
 
 # Enable virtual-pnor by DISTRO_FEATURE openpower-ubi-fs.
 PACKAGECONFIG_append_df-openpower-ubi-fs = "virtual-pnor"

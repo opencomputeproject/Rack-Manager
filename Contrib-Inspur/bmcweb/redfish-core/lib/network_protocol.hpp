@@ -18,8 +18,9 @@
 #include "error_messages.hpp"
 #include "node.hpp"
 
+#include <optional>
+#include <utils/json_utils.hpp>
 #include <variant>
-
 namespace redfish
 {
 
@@ -51,23 +52,80 @@ using UnitStruct =
                std::string, sdbusplus::message::object_path, uint32_t,
                std::string, sdbusplus::message::object_path>;
 
-struct ServiceConfiguration
-{
-    const char* serviceName;
-    const char* socketPath;
-};
+const static boost::container::flat_map<const char*, std::string>
+    protocolToDBus{{"SSH", "dropbear"},
+                   {"HTTPS", "bmcweb"},
+                   {"IPMI", "phosphor-ipmi-net"}};
 
-const static boost::container::flat_map<const char*, ServiceConfiguration>
-    protocolToDBus{
-        {"SSH",
-         {"dropbear.service",
-          "/org/freedesktop/systemd1/unit/dropbear_2esocket"}},
-        {"HTTPS",
-         {"phosphor-gevent.service",
-          "/org/freedesktop/systemd1/unit/phosphor_2dgevent_2esocket"}},
-        {"IPMI",
-         {"phosphor-ipmi-net.service",
-          "/org/freedesktop/systemd1/unit/phosphor_2dipmi_2dnet_2esocket"}}};
+inline void
+    extractNTPServersAndDomainNamesData(const GetManagedObjects& dbus_data,
+                                        std::vector<std::string>& ntpData,
+                                        std::vector<std::string>& dnData)
+{
+    for (const auto& obj : dbus_data)
+    {
+        for (const auto& ifacePair : obj.second)
+        {
+            if (obj.first == "/xyz/openbmc_project/network/eth0")
+            {
+                if (ifacePair.first ==
+                    "xyz.openbmc_project.Network.EthernetInterface")
+                {
+                    for (const auto& propertyPair : ifacePair.second)
+                    {
+                        if (propertyPair.first == "NTPServers")
+                        {
+                            const std::vector<std::string>* ntpServers =
+                                sdbusplus::message::variant_ns::get_if<
+                                    std::vector<std::string>>(
+                                    &propertyPair.second);
+                            if (ntpServers != nullptr)
+                            {
+                                ntpData = std::move(*ntpServers);
+                            }
+                        }
+                        else if (propertyPair.first == "DomainName")
+                        {
+                            const std::vector<std::string>* domainNames =
+                                sdbusplus::message::variant_ns::get_if<
+                                    std::vector<std::string>>(
+                                    &propertyPair.second);
+                            if (domainNames != nullptr)
+                            {
+                                dnData = std::move(*domainNames);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+template <typename CallbackFunc>
+void getEthernetIfaceData(CallbackFunc&& callback)
+{
+    crow::connections::systemBus->async_method_call(
+        [callback{std::move(callback)}](
+            const boost::system::error_code error_code,
+            const GetManagedObjects& dbus_data) {
+            std::vector<std::string> ntpServers;
+            std::vector<std::string> domainNames;
+
+            if (error_code)
+            {
+                callback(false, ntpServers, domainNames);
+                return;
+            }
+
+            extractNTPServersAndDomainNamesData(dbus_data, ntpServers,
+                                                domainNames);
+
+            callback(true, ntpServers, domainNames);
+        },
+        "xyz.openbmc_project.Network", "/xyz/openbmc_project/network",
+        "org.freedesktop.DBus.ObjectManager", "GetManagedObjects");
+}
 
 class NetworkProtocol : public Node
 {
@@ -105,10 +163,34 @@ class NetworkProtocol : public Node
         return hostName;
     }
 
+    void getNTPProtocolEnabled(const std::shared_ptr<AsyncResp>& asyncResp)
+    {
+        crow::connections::systemBus->async_method_call(
+            [asyncResp](const boost::system::error_code error_code,
+                        const std::variant<std::string>& timeSyncMethod) {
+                const std::string* s =
+                    std::get_if<std::string>(&timeSyncMethod);
+
+                if (*s == "xyz.openbmc_project.Time.Synchronization.Method.NTP")
+                {
+                    asyncResp->res.jsonValue["NTP"]["ProtocolEnabled"] = true;
+                }
+                else if (*s == "xyz.openbmc_project.Time.Synchronization."
+                               "Method.Manual")
+                {
+                    asyncResp->res.jsonValue["NTP"]["ProtocolEnabled"] = false;
+                }
+            },
+            "xyz.openbmc_project.Settings",
+            "/xyz/openbmc_project/time/sync_method",
+            "org.freedesktop.DBus.Properties", "Get",
+            "xyz.openbmc_project.Time.Synchronization", "TimeSyncMethod");
+    }
+
     void getData(const std::shared_ptr<AsyncResp>& asyncResp)
     {
         asyncResp->res.jsonValue["@odata.type"] =
-            "#ManagerNetworkProtocol.v1_1_0.ManagerNetworkProtocol";
+            "#ManagerNetworkProtocol.v1_4_0.ManagerNetworkProtocol";
         asyncResp->res.jsonValue["@odata.id"] =
             "/redfish/v1/Managers/bmc/NetworkProtocol";
         asyncResp->res.jsonValue["@odata.context"] =
@@ -126,37 +208,80 @@ class NetworkProtocol : public Node
             asyncResp->res.jsonValue[protocol.first]["ProtocolEnabled"] = false;
         }
 
-        asyncResp->res.jsonValue["HostName"] = getHostName();
+        std::string hostName = getHostName();
+
+        asyncResp->res.jsonValue["HostName"] = hostName;
+
+        getNTPProtocolEnabled(asyncResp);
+
+        // TODO Get eth0 interface data, and call the below callback for JSON
+        // preparation
+        getEthernetIfaceData(
+            [hostName, asyncResp](const bool& success,
+                                  const std::vector<std::string>& ntpServers,
+                                  const std::vector<std::string>& domainNames) {
+                if (!success)
+                {
+                    messages::resourceNotFound(asyncResp->res,
+                                               "EthernetInterface", "eth0");
+                    return;
+                }
+                asyncResp->res.jsonValue["NTP"]["NTPServers"] = ntpServers;
+                if (hostName.empty() == false)
+                {
+                    std::string FQDN = std::move(hostName);
+                    if (domainNames.empty() == false)
+                    {
+                        FQDN += "." + domainNames[0];
+                    }
+                    asyncResp->res.jsonValue["FQDN"] = std::move(FQDN);
+                }
+            });
 
         crow::connections::systemBus->async_method_call(
-            [asyncResp](const boost::system::error_code ec,
-                        const std::vector<UnitStruct>& resp) {
-                if (ec)
+            [asyncResp](const boost::system::error_code e,
+                        const std::vector<UnitStruct>& r) {
+                if (e)
                 {
                     asyncResp->res.jsonValue = nlohmann::json::object();
                     messages::internalError(asyncResp->res);
                     return;
                 }
+                asyncResp->res.jsonValue["HTTPS"]["Certificates"] = {
+                    {"@odata.id", "/redfish/v1/Managers/bmc/NetworkProtocol/"
+                                  "HTTPS/Certificates"}};
 
-                for (auto& unit : resp)
+                for (auto& unit : r)
                 {
+                    /* Only traverse through <xyz>.socket units */
+                    std::string unitName = std::get<NET_PROTO_UNIT_NAME>(unit);
+                    if (!boost::ends_with(unitName, ".socket"))
+                    {
+                        continue;
+                    }
+
                     for (auto& kv : protocolToDBus)
                     {
-                        if (kv.second.serviceName ==
-                            std::get<NET_PROTO_UNIT_NAME>(unit))
+                        // We are interested in services, which starts with
+                        // mapped service name
+                        if (!boost::starts_with(unitName, kv.second))
                         {
                             continue;
                         }
-                        const char* service = kv.first;
-                        const char* socketPath = kv.second.socketPath;
+                        const char* rfServiceKey = kv.first;
+                        std::string socketPath =
+                            std::get<NET_PROTO_UNIT_OBJ_PATH>(unit);
+                        std::string unitState =
+                            std::get<NET_PROTO_UNIT_SUB_STATE>(unit);
 
-                        asyncResp->res.jsonValue[service]["ProtocolEnabled"] =
-                            std::get<NET_PROTO_UNIT_SUB_STATE>(unit) ==
-                            "running";
+                        asyncResp->res
+                            .jsonValue[rfServiceKey]["ProtocolEnabled"] =
+                            (unitState == "running") ||
+                            (unitState == "listening");
 
                         crow::connections::systemBus->async_method_call(
-                            [asyncResp, service{std::string(service)},
-                             socketPath](
+                            [asyncResp,
+                             rfServiceKey{std::string(rfServiceKey)}](
                                 const boost::system::error_code ec,
                                 const std::variant<std::vector<std::tuple<
                                     std::string, std::string>>>& resp) {
@@ -188,33 +313,133 @@ class NetworkProtocol : public Node
                                 }
                                 std::string portStr =
                                     listenStream.substr(lastColonPos + 1);
+                                if (portStr.empty())
+                                {
+                                    return;
+                                }
                                 char* endPtr = nullptr;
+                                errno = 0;
                                 // Use strtol instead of stroi to avoid
                                 // exceptions
                                 long port =
                                     std::strtol(portStr.c_str(), &endPtr, 10);
-
-                                if (*endPtr != '\0' || portStr.empty())
+                                if ((errno == 0) && (*endPtr == '\0'))
                                 {
-                                    // Invalid value
-                                    asyncResp->res.jsonValue[service]["Port"] =
-                                        nullptr;
+                                    asyncResp->res
+                                        .jsonValue[rfServiceKey]["Port"] = port;
                                 }
-                                else
-                                {
-                                    // Everything OK
-                                    asyncResp->res.jsonValue[service]["Port"] =
-                                        port;
-                                }
+                                return;
                             },
                             "org.freedesktop.systemd1", socketPath,
                             "org.freedesktop.DBus.Properties", "Get",
                             "org.freedesktop.systemd1.Socket", "Listen");
+
+                        // We found service, break the inner loop.
+                        break;
                     }
                 }
             },
             "org.freedesktop.systemd1", "/org/freedesktop/systemd1",
             "org.freedesktop.systemd1.Manager", "ListUnits");
+    }
+
+    void handleHostnamePatch(const std::string& hostName,
+                             const std::shared_ptr<AsyncResp>& asyncResp)
+    {
+        crow::connections::systemBus->async_method_call(
+            [asyncResp](const boost::system::error_code ec) {
+                if (ec)
+                {
+                    messages::internalError(asyncResp->res);
+                    return;
+                }
+            },
+            "xyz.openbmc_project.Network",
+            "/xyz/openbmc_project/network/config",
+            "org.freedesktop.DBus.Properties", "Set",
+            "xyz.openbmc_project.Network.SystemConfiguration", "HostName",
+            std::variant<std::string>(hostName));
+    }
+
+    void handleNTPProtocolEnabled(const bool& ntpEnabled,
+                                  const std::shared_ptr<AsyncResp>& asyncResp)
+    {
+        std::string timeSyncMethod;
+        if (ntpEnabled)
+        {
+            timeSyncMethod =
+                "xyz.openbmc_project.Time.Synchronization.Method.NTP";
+        }
+        else
+        {
+            timeSyncMethod =
+                "xyz.openbmc_project.Time.Synchronization.Method.Manual";
+        }
+
+        crow::connections::systemBus->async_method_call(
+            [asyncResp](const boost::system::error_code error_code) {},
+            "xyz.openbmc_project.Settings",
+            "/xyz/openbmc_project/time/sync_method",
+            "org.freedesktop.DBus.Properties", "Set",
+            "xyz.openbmc_project.Time.Synchronization", "TimeSyncMethod",
+            std::variant<std::string>{timeSyncMethod});
+    }
+
+    void handleNTPServersPatch(const std::vector<std::string>& ntpServers,
+                               const std::shared_ptr<AsyncResp>& asyncResp)
+    {
+        crow::connections::systemBus->async_method_call(
+            [asyncResp](const boost::system::error_code ec) {
+                if (ec)
+                {
+                    messages::internalError(asyncResp->res);
+                    return;
+                }
+            },
+            "xyz.openbmc_project.Network", "/xyz/openbmc_project/network/eth0",
+            "org.freedesktop.DBus.Properties", "Set",
+            "xyz.openbmc_project.Network.EthernetInterface", "NTPServers",
+            std::variant<std::vector<std::string>>{ntpServers});
+    }
+
+    void doPatch(crow::Response& res, const crow::Request& req,
+                 const std::vector<std::string>& params) override
+    {
+        std::shared_ptr<AsyncResp> asyncResp = std::make_shared<AsyncResp>(res);
+        std::optional<std::string> newHostName;
+        std::optional<nlohmann::json> ntp;
+
+        if (!json_util::readJson(req, res, "HostName", newHostName, "NTP", ntp))
+        {
+            return;
+        }
+
+        res.result(boost::beast::http::status::no_content);
+        if (newHostName)
+        {
+            handleHostnamePatch(*newHostName, asyncResp);
+        }
+
+        if (ntp)
+        {
+            std::optional<std::vector<std::string>> ntpServers;
+            std::optional<bool> ntpEnabled;
+            if (!json_util::readJson(*ntp, res, "NTPServers", ntpServers,
+                                     "ProtocolEnabled", ntpEnabled))
+            {
+                return;
+            }
+
+            if (ntpEnabled)
+            {
+                handleNTPProtocolEnabled(*ntpEnabled, asyncResp);
+            }
+
+            if (ntpServers)
+            {
+                handleNTPServersPatch(*ntpServers, asyncResp);
+            }
+        }
     }
 };
 

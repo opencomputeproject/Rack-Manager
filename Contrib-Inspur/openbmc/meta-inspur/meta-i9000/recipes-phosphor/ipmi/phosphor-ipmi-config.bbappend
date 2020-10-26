@@ -1,0 +1,1 @@
+FILESEXTRAPATHS_prepend_i9000 := "${THISDIR}/${PN}:"

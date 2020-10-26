@@ -13,7 +13,8 @@ PV = "4.0.4"
 
 SRCREV = "3bbd4321618503d14008387a72fabb6743878831"
 SRC_URI = "git://github.com/Pulse-Eight/libcec.git \
-"
+           file://0001-CheckPlatformSupport.cmake-Do-not-hardcode-lib-path.patch \
+          "
 
 S = "${WORKDIR}/git"
 
@@ -22,7 +23,7 @@ inherit cmake pkgconfig
 # Put client tools into a separate package
 PACKAGE_BEFORE_PN += "${PN}-tools"
 FILES_${PN}-tools = "${bindir}"
-RDEPENDS_${PN}-tools = "python3-${BPN}"
+RDEPENDS_${PN}-tools = "python3-${BPN} python3-core"
 
 # Create the wrapper for python3
 PACKAGES += "python3-${BPN}"

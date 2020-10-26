@@ -1,5 +1,5 @@
 /*
-// Copyright (c) 2018 Intel Corporation
+// Copyright (c) 2018-2019 Intel Corporation
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,22 +14,58 @@
 // limitations under the License.
 */
 #pragma once
-
+// modify by mengyaohui 2020.02.11
+#ifdef BMCWEB_ENABLE_REDFISH_RMC
 #include "../lib/account_service.hpp"
-#include "../lib/chassis.hpp"
-#include "../lib/cpudimm.hpp"
-#include "../lib/ethernet.hpp"
-#include "../lib/log_services.hpp"
-#include "../lib/managers.hpp"
-#include "../lib/network_protocol.hpp"
-#include "../lib/power.hpp"
+#include "../lib/bios.hpp"
+#include "../lib/certificate_service.hpp"
+#include "../lib/rmc/rmc_chassis.hpp"//
+#include "../lib/rmc/rmc_cpudimm.hpp"
+#include "../lib/rmc/rmc_ethernet.hpp"//
+#include "../lib/rmc/rmc_log_services.hpp"//
+#include "../lib/rmc/rmc_managers.hpp"//
+#include "../lib/message_registries.hpp"
+#include "../lib/rmc/rmc_network_protocol.hpp"//
+#include "../lib/pcie.hpp"
+#include "../lib/rmc/rmc_power.hpp"//
 #include "../lib/redfish_sessions.hpp"
 #include "../lib/roles.hpp"
+#include "../lib/sensors.hpp"
 #include "../lib/service_root.hpp"
-#include "../lib/systems.hpp"
-#include "../lib/thermal.hpp"
-#include "../lib/update_service.hpp"
-#include "webserver_common.hpp"
+#include "../lib/storage.hpp"
+#include "../lib/rmc/rmc_systems.hpp"//
+#include "../lib/rmc/rmc_thermal.hpp"//
+#include "../lib/rmc/rmc_update_service.hpp"//
+#ifdef BMCWEB_ENABLE_VM_NBDPROXY
+#include "../lib/virtual_media.hpp"
+#endif // BMCWEB_ENABLE_VM_NBDPROXY
+#include "webserver_common.hpp"  
+#else
+#include "../lib/account_service.hpp"
+#include "../lib/bios.hpp"
+#include "../lib/certificate_service.hpp"
+#include "../lib/chassis.hpp"//
+#include "../lib/cpudimm.hpp"
+#include "../lib/ethernet.hpp"//
+#include "../lib/log_services.hpp"//
+#include "../lib/managers.hpp"//
+#include "../lib/message_registries.hpp"
+#include "../lib/network_protocol.hpp"//
+#include "../lib/pcie.hpp"
+#include "../lib/power.hpp"//
+#include "../lib/redfish_sessions.hpp"
+#include "../lib/roles.hpp"
+#include "../lib/sensors.hpp"
+#include "../lib/service_root.hpp"
+#include "../lib/storage.hpp"
+#include "../lib/systems.hpp"//
+#include "../lib/thermal.hpp"//
+#include "../lib/update_service.hpp"//
+#ifdef BMCWEB_ENABLE_VM_NBDPROXY
+#include "../lib/virtual_media.hpp"
+#endif // BMCWEB_ENABLE_VM_NBDPROXY
+#include "webserver_common.hpp"  
+#endif                                                                                                                                                                                                                                                                            
 
 namespace redfish
 {
@@ -67,6 +103,13 @@ class RedfishService
         nodes.emplace_back(std::make_unique<ChassisCollection>(app));
         nodes.emplace_back(std::make_unique<Chassis>(app));
         nodes.emplace_back(std::make_unique<UpdateService>(app));
+        nodes.emplace_back(std::make_unique<StorageCollection>(app));
+        nodes.emplace_back(std::make_unique<Storage>(app));
+        nodes.emplace_back(std::make_unique<Drive>(app));
+#ifdef BMCWEB_INSECURE_ENABLE_REDFISH_FW_TFTP_UPDATE
+        nodes.emplace_back(
+            std::make_unique<UpdateServiceActionsSimpleUpdate>(app));
+#endif
         nodes.emplace_back(std::make_unique<SoftwareInventoryCollection>(app));
         nodes.emplace_back(std::make_unique<SoftwareInventory>(app));
         nodes.emplace_back(
@@ -75,8 +118,12 @@ class RedfishService
 
         nodes.emplace_back(std::make_unique<SystemLogServiceCollection>(app));
         nodes.emplace_back(std::make_unique<EventLogService>(app));
-        nodes.emplace_back(std::make_unique<EventLogEntryCollection>(app));
-        nodes.emplace_back(std::make_unique<EventLogEntry>(app));
+#ifndef BMCWEB_ENABLE_REDFISH_DBUS_LOG_ENTRIES
+        nodes.emplace_back(
+            std::make_unique<JournalEventLogEntryCollection>(app));
+        nodes.emplace_back(std::make_unique<JournalEventLogEntry>(app));
+        nodes.emplace_back(std::make_unique<JournalEventLogClear>(app));
+#endif
 
         nodes.emplace_back(std::make_unique<BMCLogServiceCollection>(app));
 #ifdef BMCWEB_ENABLE_REDFISH_BMC_JOURNAL
@@ -86,10 +133,12 @@ class RedfishService
 #endif
 
 #ifdef BMCWEB_ENABLE_REDFISH_CPU_LOG
-        nodes.emplace_back(std::make_unique<CPULogService>(app));
-        nodes.emplace_back(std::make_unique<CPULogEntryCollection>(app));
-        nodes.emplace_back(std::make_unique<CPULogEntry>(app));
-        nodes.emplace_back(std::make_unique<ImmediateCPULog>(app));
+        nodes.emplace_back(std::make_unique<CrashdumpService>(app));
+        nodes.emplace_back(std::make_unique<CrashdumpEntryCollection>(app));
+        nodes.emplace_back(std::make_unique<CrashdumpEntry>(app));
+        nodes.emplace_back(std::make_unique<CrashdumpFile>(app));
+        nodes.emplace_back(std::make_unique<CrashdumpClear>(app));
+        nodes.emplace_back(std::make_unique<OnDemandCrashdump>(app));
 #ifdef BMCWEB_ENABLE_REDFISH_RAW_PECI
         nodes.emplace_back(std::make_unique<SendRawPECI>(app));
 #endif // BMCWEB_ENABLE_REDFISH_RAW_PECI
@@ -103,6 +152,51 @@ class RedfishService
         nodes.emplace_back(std::make_unique<SystemsCollection>(app));
         nodes.emplace_back(std::make_unique<Systems>(app));
         nodes.emplace_back(std::make_unique<SystemActionsReset>(app));
+        nodes.emplace_back(std::make_unique<BiosService>(app));
+        nodes.emplace_back(std::make_unique<BiosReset>(app));
+#ifdef BMCWEB_ENABLE_VM_NBDPROXY
+        nodes.emplace_back(std::make_unique<VirtualMedia>(app));
+        nodes.emplace_back(std::make_unique<VirtualMediaCollection>(app));
+        nodes.emplace_back(
+            std::make_unique<VirtualMediaActionInsertMedia>(app));
+        nodes.emplace_back(std::make_unique<VirtualMediaActionEjectMedia>(app));
+#endif // BMCWEB_ENABLE_VM_NBDPROXY
+#ifdef BMCWEB_ENABLE_REDFISH_DBUS_LOG_ENTRIES
+        nodes.emplace_back(std::make_unique<DBusLogServiceActionsClear>(app));
+        nodes.emplace_back(std::make_unique<DBusEventLogEntryCollection>(app));
+        nodes.emplace_back(std::make_unique<DBusEventLogEntry>(app));
+#endif
+
+        nodes.emplace_back(
+            std::make_unique<MessageRegistryFileCollection>(app));
+        nodes.emplace_back(std::make_unique<BaseMessageRegistryFile>(app));
+        nodes.emplace_back(std::make_unique<BaseMessageRegistry>(app));
+        nodes.emplace_back(std::make_unique<OpenBMCMessageRegistryFile>(app));
+        nodes.emplace_back(std::make_unique<OpenBMCMessageRegistry>(app));
+        nodes.emplace_back(std::make_unique<CertificateService>(app));
+        nodes.emplace_back(
+            std::make_unique<CertificateActionsReplaceCertificate>(app));
+        nodes.emplace_back(std::make_unique<CertificateLocations>(app));
+        nodes.emplace_back(std::make_unique<HTTPSCertificateCollection>(app));
+        nodes.emplace_back(std::make_unique<HTTPSCertificate>(app));
+        nodes.emplace_back(std::make_unique<LDAPCertificateCollection>(app));
+        nodes.emplace_back(std::make_unique<LDAPCertificate>(app));
+        nodes.emplace_back(std::make_unique<CertificateActionGenerateCSR>(app));
+        nodes.emplace_back(
+            std::make_unique<TrustStoreCertificateCollection>(app));
+        nodes.emplace_back(std::make_unique<TrustStoreCertificate>(app));
+        nodes.emplace_back(std::make_unique<SystemPCIeFunctionCollection>(app));
+        nodes.emplace_back(std::make_unique<SystemPCIeFunction>(app));
+        nodes.emplace_back(std::make_unique<SystemPCIeDeviceCollection>(app));
+        nodes.emplace_back(std::make_unique<SystemPCIeDevice>(app));
+
+        nodes.emplace_back(std::make_unique<SensorCollection>(app));
+        nodes.emplace_back(std::make_unique<Sensor>(app));
+
+        for (const auto& node : nodes)
+        {
+            node->initPrivileges();
+        }
     }
 
   private:

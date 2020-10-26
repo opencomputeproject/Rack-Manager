@@ -1,23 +1,29 @@
 #pragma once
 
-#include <crow/app.h>
-#include <crow/http_request.h>
-#include <crow/http_response.h>
-
 #include <boost/container/flat_map.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
+#include <csignal>
+#include <dbus_singleton.hpp>
 #include <nlohmann/json.hpp>
 #include <pam_authenticate.hpp>
 #include <random>
-#include <webassets.hpp>
+#include <sdbusplus/bus/match.hpp>
+
+#include "logging.h"
+#include "utility.h"
 
 namespace crow
 {
 
 namespace persistent_data
 {
+
+// entropy: 20 characters, 62 possibilities.  log2(62^20) = 119 bits of
+// entropy.  OWASP recommends at least 64
+// https://cheatsheetseries.owasp.org/cheatsheets/Session_Management_Cheat_Sheet.html#session-id-entropy
+constexpr std::size_t sessionTokenSize = 20;
 
 enum class PersistenceType
 {
@@ -96,48 +102,88 @@ struct UserSession
     }
 };
 
+struct AuthConfigMethods
+{
+    bool xtoken = true;
+    bool cookie = true;
+    bool sessionToken = true;
+    bool basic = true;
+    bool tls = false;
+
+    void fromJson(const nlohmann::json& j)
+    {
+        for (const auto& element : j.items())
+        {
+            const bool* value = element.value().get_ptr<const bool*>();
+            if (value == nullptr)
+            {
+                continue;
+            }
+
+            if (element.key() == "XToken")
+            {
+                xtoken = *value;
+            }
+            else if (element.key() == "Cookie")
+            {
+                cookie = *value;
+            }
+            else if (element.key() == "SessionToken")
+            {
+                sessionToken = *value;
+            }
+            else if (element.key() == "BasicAuth")
+            {
+                basic = *value;
+            }
+            else if (element.key() == "TLS")
+            {
+                tls = *value;
+            }
+        }
+    }
+};
+
 class Middleware;
 
 class SessionStore
 {
   public:
     std::shared_ptr<UserSession> generateUserSession(
-        const boost::string_view username,
+        const std::string_view username,
         PersistenceType persistence = PersistenceType::TIMEOUT)
     {
         // TODO(ed) find a secure way to not generate session identifiers if
         // persistence is set to SINGLE_REQUEST
         static constexpr std::array<char, 62> alphanum = {
-            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'b', 'C',
-            'D', 'E', 'F', 'g', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
-            'Q', 'r', 'S', 'T', 'U', 'v', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c',
+            '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'A', 'B', 'C',
+            'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P',
+            'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', 'a', 'b', 'c',
             'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p',
             'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z'};
 
-        // entropy: 30 characters, 62 possibilities.  log2(62^30) = 178 bits of
-        // entropy.  OWASP recommends at least 60
-        // https://www.owasp.org/index.php/Session_Management_Cheat_Sheet#Session_ID_Entropy
         std::string sessionToken;
-        sessionToken.resize(20, '0');
-        std::uniform_int_distribution<int> dist(0, alphanum.size() - 1);
-        for (int i = 0; i < sessionToken.size(); ++i)
+        sessionToken.resize(sessionTokenSize, '0');
+        std::uniform_int_distribution<size_t> dist(0, alphanum.size() - 1);
+        for (size_t i = 0; i < sessionToken.size(); ++i)
         {
             sessionToken[i] = alphanum[dist(rd)];
         }
         // Only need csrf tokens for cookie based auth, token doesn't matter
         std::string csrfToken;
-        csrfToken.resize(20, '0');
-        for (int i = 0; i < csrfToken.size(); ++i)
+        csrfToken.resize(sessionTokenSize, '0');
+        for (size_t i = 0; i < csrfToken.size(); ++i)
         {
             csrfToken[i] = alphanum[dist(rd)];
         }
 
         std::string uniqueId;
         uniqueId.resize(10, '0');
-        for (int i = 0; i < uniqueId.size(); ++i)
+        for (size_t i = 0; i < uniqueId.size(); ++i)
         {
             uniqueId[i] = alphanum[dist(rd)];
         }
+
         auto session = std::make_shared<UserSession>(UserSession{
             uniqueId, sessionToken, std::string(username), csrfToken,
             std::chrono::steady_clock::now(), persistence});
@@ -148,9 +194,13 @@ class SessionStore
     }
 
     std::shared_ptr<UserSession>
-        loginSessionByToken(const boost::string_view token)
+        loginSessionByToken(const std::string_view token)
     {
         applySessionTimeouts();
+        if (token.size() != sessionTokenSize)
+        {
+            return nullptr;
+        }
         auto sessionIt = authTokens.find(std::string(token));
         if (sessionIt == authTokens.end())
         {
@@ -161,7 +211,7 @@ class SessionStore
         return userSession;
     }
 
-    std::shared_ptr<UserSession> getSessionByUid(const boost::string_view uid)
+    std::shared_ptr<UserSession> getSessionByUid(const std::string_view uid)
     {
         applySessionTimeouts();
         // TODO(Ed) this is inefficient
@@ -201,11 +251,28 @@ class SessionStore
         return ret;
     }
 
+    void updateAuthMethodsConfig(const AuthConfigMethods& config)
+    {
+        bool isTLSchanged = (authMethodsConfig.tls != config.tls);
+        authMethodsConfig = config;
+        needWrite = true;
+        if (isTLSchanged)
+        {
+            // recreate socket connections with new settings
+            std::raise(SIGHUP);
+        }
+    }
+
+    AuthConfigMethods& getAuthMethodsConfig()
+    {
+        return authMethodsConfig;
+    }
+
     bool needsWrite()
     {
         return needWrite;
     }
-    int getTimeoutInSeconds() const
+    int64_t getTimeoutInSeconds() const
     {
         return std::chrono::seconds(timeoutInMinutes).count();
     };
@@ -250,12 +317,16 @@ class SessionStore
             }
         }
     }
+
     std::chrono::time_point<std::chrono::steady_clock> lastTimeoutUpdate;
-    boost::container::flat_map<std::string, std::shared_ptr<UserSession>>
+    std::unordered_map<std::string, std::shared_ptr<UserSession>,
+                       std::hash<std::string>,
+                       crow::utility::ConstantTimeCompare>
         authTokens;
     std::random_device rd;
     bool needWrite{false};
     std::chrono::minutes timeoutInMinutes;
+    AuthConfigMethods authMethodsConfig;
 };
 
 } // namespace persistent_data
@@ -279,6 +350,19 @@ struct adl_serializer<std::shared_ptr<crow::persistent_data::UserSession>>
                                {"username", p->username},
                                {"csrf_token", p->csrfToken}};
         }
+    }
+};
+
+template <> struct adl_serializer<crow::persistent_data::AuthConfigMethods>
+{
+    static void to_json(nlohmann::json& j,
+                        const crow::persistent_data::AuthConfigMethods& c)
+    {
+        j = nlohmann::json{{"XToken", c.xtoken},
+                           {"Cookie", c.cookie},
+                           {"SessionToken", c.sessionToken},
+                           {"BasicAuth", c.basic},
+                           {"TLS", c.tls}};
     }
 };
 } // namespace nlohmann

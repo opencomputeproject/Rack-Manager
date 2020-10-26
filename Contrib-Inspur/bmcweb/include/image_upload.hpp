@@ -1,6 +1,6 @@
 #pragma once
 
-#include <crow/app.h>
+#include <app.h>
 
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
@@ -29,12 +29,12 @@ inline void uploadImageHandler(const crow::Request& req, crow::Response& res,
         return;
     }
     // Make this const static so it survives outside this method
-    static boost::asio::deadline_timer timeout(*req.ioService,
-                                               boost::posix_time::seconds(5));
+    static boost::asio::steady_timer timeout(*req.ioService,
+                                             std::chrono::seconds(5));
 
-    timeout.expires_from_now(boost::posix_time::seconds(10));
+    timeout.expires_after(std::chrono::seconds(15));
 
-    timeout.async_wait([&res](const boost::system::error_code& ec) {
+    auto timeoutHandler = [&res](const boost::system::error_code& ec) {
         fwUpdateMatcher = nullptr;
         if (ec == asio::error::operation_aborted)
         {
@@ -57,7 +57,7 @@ inline void uploadImageHandler(const crow::Request& req, crow::Response& res,
             {"message", "400 Bad Request"},
             {"status", "error"}};
         res.end();
-    });
+    };
 
     std::function<void(sdbusplus::message::message&)> callback =
         [&res](sdbusplus::message::message& m) {
@@ -76,12 +76,7 @@ inline void uploadImageHandler(const crow::Request& req, crow::Response& res,
                                         "xyz.openbmc_project.Software.Version";
                              }) != interfaces.end())
             {
-                boost::system::error_code ec;
-                timeout.cancel(ec);
-                if (ec)
-                {
-                    BMCWEB_LOG_ERROR << "error canceling timer " << ec;
-                }
+                timeout.cancel();
 
                 std::size_t index = path.str.rfind('/');
                 if (index != std::string::npos)
@@ -110,11 +105,13 @@ inline void uploadImageHandler(const crow::Request& req, crow::Response& res,
                                     std::ofstream::trunc);
     out << req.body;
     out.close();
+    timeout.async_wait(timeoutHandler);
 }
 
 template <typename... Middlewares> void requestRoutes(Crow<Middlewares...>& app)
 {
     BMCWEB_ROUTE(app, "/upload/image/<str>")
+        .requires({"ConfigureComponents", "ConfigureManager"})
         .methods("POST"_method,
                  "PUT"_method)([](const crow::Request& req, crow::Response& res,
                                   const std::string& filename) {
@@ -122,6 +119,7 @@ template <typename... Middlewares> void requestRoutes(Crow<Middlewares...>& app)
         });
 
     BMCWEB_ROUTE(app, "/upload/image")
+        .requires({"ConfigureComponents", "ConfigureManager"})
         .methods("POST"_method, "PUT"_method)(
             [](const crow::Request& req, crow::Response& res) {
                 uploadImageHandler(req, res, "");

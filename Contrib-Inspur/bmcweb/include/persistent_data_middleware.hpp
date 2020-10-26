@@ -1,13 +1,14 @@
 #pragma once
 
-#include <crow/app.h>
-#include <crow/http_request.h>
-#include <crow/http_response.h>
+#include <app.h>
+#include <http_request.h>
+#include <http_response.h>
 
 #include <boost/container/flat_map.hpp>
 #include <boost/uuid/uuid.hpp>
 #include <boost/uuid/uuid_generators.hpp>
 #include <boost/uuid/uuid_io.hpp>
+#include <filesystem>
 #include <nlohmann/json.hpp>
 #include <pam_authenticate.hpp>
 #include <random>
@@ -20,13 +21,16 @@ namespace crow
 namespace persistent_data
 {
 
+namespace fs = std::filesystem;
+
 class Middleware
 {
-    // todo(ed) should read this from a fixed location somewhere, not CWD
-    static constexpr const char* filename = "bmcweb_persistent_data.json";
-    int jsonRevision = 1;
+    uint64_t jsonRevision = 1;
 
   public:
+    // todo(ed) should read this from a fixed location somewhere, not CWD
+    static constexpr const char* filename = "bmcweb_persistent_data.json";
+
     struct Context
     {
     };
@@ -58,7 +62,7 @@ class Middleware
     void readData()
     {
         std::ifstream persistentFile(filename);
-        int fileRevision = 0;
+        uint64_t fileRevision = 0;
         if (persistentFile.is_open())
         {
             // call with exceptions disabled
@@ -95,6 +99,12 @@ class Middleware
                         {
                             systemUuid = *jSystemUuid;
                         }
+                    }
+                    else if (item.key() == "auth_config")
+                    {
+                        SessionStore::getInstance()
+                            .getAuthMethodsConfig()
+                            .fromJson(item.value());
                     }
                     else if (item.key() == "sessions")
                     {
@@ -151,8 +161,15 @@ class Middleware
     void writeData()
     {
         std::ofstream persistentFile(filename);
+
+        // set the permission of the file to 640
+        fs::perms permission = fs::perms::owner_read | fs::perms::owner_write |
+                               fs::perms::group_read;
+        fs::permissions(filename, permission);
+
         nlohmann::json data{
             {"sessions", SessionStore::getInstance().authTokens},
+            {"auth_config", SessionStore::getInstance().getAuthMethodsConfig()},
             {"system_uuid", systemUuid},
             {"revision", jsonRevision}};
         persistentFile << data;

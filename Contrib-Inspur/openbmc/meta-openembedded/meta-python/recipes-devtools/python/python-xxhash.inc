@@ -1,7 +1,7 @@
 SUMMARY = "xxhash is a Python binding for the xxHash library by Yann Collet."
 SECTION = "devel/python"
-LICENSE = "BSD"
-LIC_FILES_CHKSUM = "file://LICENSE;md5=d2c6db5887cc6b2fac8b701d64cb8442"
+LICENSE = "BSD-2-Clause"
+LIC_FILES_CHKSUM = "file://LICENSE;md5=5a8d76283514a1b7e6a414aba38629b5"
 
-SRC_URI[md5sum] = "a4289aa01839f3ea1fb98929d9131001"
-SRC_URI[sha256sum] = "fe21f23a9d05428c75461790b670f2bf15f50a632d6c171a7e7b588269c619e6"
+SRC_URI[md5sum] = "ce9cbbcc89620fd47a2468badd08dcf0"
+SRC_URI[sha256sum] = "8b6b1afe7731d7d9cbb0398b4a811ebb5e6be5c174f72c68abf81f919a435de9"

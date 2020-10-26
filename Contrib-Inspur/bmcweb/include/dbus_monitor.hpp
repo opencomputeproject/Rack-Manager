@@ -1,7 +1,8 @@
 #pragma once
-#include <crow/app.h>
-#include <crow/websocket.h>
+#include <app.h>
+#include <websocket.h>
 
+#include <async_resp.hpp>
 #include <boost/container/flat_map.hpp>
 #include <boost/container/flat_set.hpp>
 #include <dbus_singleton.hpp>
@@ -109,13 +110,15 @@ inline int onPropertyUpdate(sd_bus_message* m, void* userdata,
 
     connection->sendText(j.dump());
     return 0;
-};
+}
 
 template <typename... Middlewares> void requestRoutes(Crow<Middlewares...>& app)
 {
     BMCWEB_ROUTE(app, "/subscribe")
+        .requires({"Login"})
         .websocket()
-        .onopen([&](crow::websocket::Connection& conn) {
+        .onopen([&](crow::websocket::Connection& conn,
+                    std::shared_ptr<bmcweb::AsyncResp> asyncResp) {
             BMCWEB_LOG_DEBUG << "Connection " << &conn << " opened";
             sessions[&conn] = DbusWebsocketSession();
         })
@@ -150,7 +153,7 @@ template <typename... Middlewares> void requestRoutes(Crow<Middlewares...>& app)
             nlohmann::json::iterator paths = j.find("paths");
             if (paths != j.end())
             {
-                int interfaceCount = thisSession.interfaces.size();
+                size_t interfaceCount = thisSession.interfaces.size();
                 if (interfaceCount == 0)
                 {
                     interfaceCount = 1;
@@ -160,7 +163,7 @@ template <typename... Middlewares> void requestRoutes(Crow<Middlewares...>& app)
                 // PropertiesChanged
                 thisSession.matches.reserve(thisSession.matches.size() +
                                             paths->size() *
-                                                (1 + interfaceCount));
+                                                (1U + interfaceCount));
             }
             std::string object_manager_match_string;
             std::string properties_match_string;
